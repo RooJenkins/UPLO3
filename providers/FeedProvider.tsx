@@ -43,8 +43,18 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const [generationQueue, setGenerationQueue] = useState<GenerationQueue[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
   
-  const { getItem, setItem } = useStorage();
+  const storage = useStorage();
+  const { getItem, setItem } = storage || {};
+  
+  // Check if storage is ready
+  useEffect(() => {
+    if (storage && typeof getItem === 'function' && typeof setItem === 'function') {
+      setStorageReady(true);
+    }
+  }, [storage, getItem, setItem]);
 
   // Helper functions
   const getStorageSize = useCallback((data: string): number => {
@@ -67,7 +77,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   }, []);
 
   const saveFeedToStorage = useCallback(async (entries: FeedEntry[]) => {
-    if (!Array.isArray(entries)) return;
+    if (!Array.isArray(entries) || !setItem || !storageReady) return;
     
     try {
       // Always clean entries aggressively - no base64 storage
@@ -106,17 +116,21 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       console.error('Failed to save feed to storage:', error);
       // Let the StorageProvider handle quota exceeded errors
     }
-  }, [setItem, getStorageSize, cleanupOldEntries]);
+  }, [setItem, getStorageSize, cleanupOldEntries, storageReady]);
 
   // Load cached feed entries on mount
   useEffect(() => {
+    if (!storageReady || !getItem || isInitialized) return;
+    
     const loadCachedEntries = async () => {
       try {
+        console.log('FeedProvider: Loading cached entries...');
         setIsLoading(true);
         const stored = await getItem(FEED_STORAGE_KEY);
         if (stored) {
           const entries = JSON.parse(stored);
           if (Array.isArray(entries)) {
+            console.log(`FeedProvider: Loaded ${entries.length} cached entries`);
             setFeed(entries.slice(0, MAX_CACHED_ENTRIES));
           }
         }
@@ -124,11 +138,13 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         console.error('Failed to load cached feed:', error);
       } finally {
         setIsLoading(false);
+        setIsInitialized(true);
+        console.log('FeedProvider: Initialization complete');
       }
     };
     
     loadCachedEntries();
-  }, [getItem]);
+  }, [storageReady, getItem, isInitialized]);
 
   // Generate outfit image using AI image editing
   const generateOutfit = useCallback(async (prompt: string, userImageBase64: string) => {
@@ -263,18 +279,38 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     });
   }, [currentIndex, feed.length, queueGeneration]);
 
-  return useMemo(() => ({
-    feed,
-    currentIndex,
-    setCurrentIndex,
-    isLoading,
-    isGenerating,
-    queueGeneration,
-    processQueue,
-    generateInitialFeed,
-    preloadNextOutfits,
-    generationQueue,
-  }), [
+  return useMemo(() => {
+    // Return loading state if storage is not ready
+    if (!storageReady) {
+      console.log('FeedProvider: Storage not ready yet');
+      return {
+        feed: [],
+        currentIndex: 0,
+        setCurrentIndex: () => {},
+        isLoading: true,
+        isGenerating: false,
+        queueGeneration: () => {},
+        processQueue: async () => {},
+        generateInitialFeed: () => {},
+        preloadNextOutfits: () => {},
+        generationQueue: [],
+      };
+    }
+
+    return {
+      feed,
+      currentIndex,
+      setCurrentIndex,
+      isLoading,
+      isGenerating,
+      queueGeneration,
+      processQueue,
+      generateInitialFeed,
+      preloadNextOutfits,
+      generationQueue,
+    };
+  }, [
+    storageReady,
     feed,
     currentIndex,
     isLoading,
