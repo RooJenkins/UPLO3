@@ -59,23 +59,27 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }
   }, [storage, getItem, setItem]);
 
-  // tRPC hooks with error handling
+  // tRPC hooks with error handling and fallback
   const generateOutfitMutation = trpc.outfit.generate.useMutation({
     onError: (error: any) => {
       console.error('Generate outfit mutation error:', error);
+      // Don't throw, let the component handle fallback
     },
   });
   const saveFeedMutation = trpc.feed.save.useMutation({
     onError: (error: any) => {
       console.warn('Save feed mutation error:', error);
+      // Non-critical, continue without cloud save
     },
   });
   const feedQuery = trpc.feed.list.useQuery(
     { limit: MAX_CACHED_ENTRIES },
     { 
       enabled: isInitialized,
-      retry: 1, // Only retry once
-      retryDelay: 1000, // Wait 1 second before retry
+      retry: false, // Don't retry to avoid blocking
+      retryDelay: 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     }
   );
 
@@ -249,19 +253,54 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       return;
     }
 
-    try {
-      console.log(`Generating outfit via tRPC: ${prompt}`);
+    setIsGenerating(true);
+    
+    // Always generate a fallback first for immediate feedback
+    const generateFallbackEntry = () => {
+      const mockItems = [
+        { id: '1', name: 'Classic White T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
+        { id: '2', name: 'Slim Fit Jeans', brand: 'Levi\'s', price: '$89.50', category: 'bottoms' },
+        { id: '3', name: 'White Sneakers', brand: 'Adidas', price: '$120.00', category: 'shoes' },
+        { id: '4', name: 'Leather Jacket', brand: 'Zara', price: '$199.00', category: 'outerwear' },
+        { id: '5', name: 'Casual Blazer', brand: 'H&M', price: '$79.99', category: 'outerwear' },
+        { id: '6', name: 'Summer Dress', brand: 'Gap', price: '$59.95', category: 'dresses' },
+      ];
       
-      // Use tRPC mutation for cloud processing
-      const result = await generateOutfitMutation.mutateAsync({
+      const randomItems = mockItems.sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 3) + 2);
+      
+      return {
+        id: Date.now().toString(),
+        imageUrl: userImageBase64, // Use original image as fallback
         prompt: prompt.trim(),
-        userImageBase64,
         outfitId: `outfit_${Date.now()}`,
-      });
+        items: randomItems,
+        metadata: {
+          style: 'casual',
+          occasion: 'everyday',
+          season: 'all',
+          colors: ['black', 'white'],
+        },
+        timestamp: Date.now(),
+      };
+    };
+
+    try {
+      console.log(`Attempting to generate outfit via tRPC: ${prompt}`);
+      
+      // Try tRPC mutation for cloud processing with timeout
+      const result = await Promise.race([
+        generateOutfitMutation.mutateAsync({
+          prompt: prompt.trim(),
+          userImageBase64,
+          outfitId: `outfit_${Date.now()}`,
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('tRPC timeout')), 5000)
+        )
+      ]) as any;
       
       // Remove from queue
       setGenerationQueue(prev => prev.filter(item => item.prompt !== prompt));
-      setIsGenerating(false);
       
       // Create feed entry with cloud-generated data
       const newEntry: FeedEntry = {
@@ -294,45 +333,24 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       
       console.log(`Successfully generated and cached outfit: ${result.id}`);
     } catch (error) {
-      console.error('Failed to generate outfit via tRPC:', error);
+      console.warn('tRPC generation failed, using fallback:', error);
       
-      // Fallback: Generate a mock outfit entry when backend is unavailable
-      try {
-        console.log('Generating fallback mock outfit...');
-        
-        const mockEntry: FeedEntry = {
-          id: Date.now().toString(),
-          imageUrl: userImageBase64, // Use original image as fallback
-          prompt: prompt.trim(),
-          outfitId: `outfit_${Date.now()}`,
-          items: [
-            { id: '1', name: 'Classic T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
-            { id: '2', name: 'Slim Jeans', brand: 'Levi\'s', price: '$89.50', category: 'bottoms' },
-            { id: '3', name: 'White Sneakers', brand: 'Adidas', price: '$120.00', category: 'shoes' },
-          ],
-          metadata: {
-            style: 'casual',
-            occasion: 'everyday',
-            season: 'all',
-            colors: ['black', 'white'],
-          },
-          timestamp: Date.now(),
-        };
-        
-        // Update local feed with mock entry
-        setFeed(prev => {
-          const updated = [mockEntry, ...prev].slice(0, MAX_CACHED_ENTRIES);
-          setTimeout(() => saveFeedToStorage(updated), 500);
-          return updated;
-        });
-        
-        console.log('Generated fallback mock outfit');
-      } catch (fallbackError) {
-        console.error('Failed to generate fallback outfit:', fallbackError);
-      }
+      // Generate fallback mock outfit entry
+      const mockEntry: FeedEntry = generateFallbackEntry();
       
+      // Remove from queue
+      setGenerationQueue(prev => prev.filter(item => item.prompt !== prompt));
+      
+      // Update local feed with mock entry
+      setFeed(prev => {
+        const updated = [mockEntry, ...prev].slice(0, MAX_CACHED_ENTRIES);
+        setTimeout(() => saveFeedToStorage(updated), 500);
+        return updated;
+      });
+      
+      console.log('Generated fallback mock outfit:', mockEntry.id);
+    } finally {
       setIsGenerating(false);
-      setGenerationQueue(prev => prev.slice(1)); // Remove failed item
     }
   }, [generateOutfitMutation, saveFeedMutation, saveFeedToStorage, preloadImage]);
 
@@ -409,6 +427,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   }, [currentIndex, feed, queueGeneration, preloadImage]);
 
   return useMemo(() => {
+    // Always return a consistent structure
     const baseReturn = {
       feed: feed || [],
       currentIndex,
@@ -429,12 +448,13 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       },
     };
 
-    // Return loading state if storage is not ready
+    // If storage is not ready, return loading state but with same structure
     if (!storageReady) {
       console.log('FeedProvider: Storage not ready yet');
       return {
-        ...baseReturn,
         feed: [],
+        currentIndex: 0,
+        setCurrentIndex: () => {},
         isLoading: true,
         isGenerating: false,
         queueGeneration: () => {},
@@ -443,6 +463,11 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         preloadNextOutfits: () => {},
         generationQueue: [],
         preloadedUrls: new Set(),
+        cloudSyncStatus: {
+          isLoading: false,
+          isError: false,
+          error: null,
+        },
       };
     }
 

@@ -12,7 +12,7 @@ const getBaseUrl = () => {
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  // Default to localhost for development
+  // For development, use the Expo dev server URL
   if (Platform.OS === 'web') {
     // Web environment - use current origin
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081';
@@ -20,7 +20,8 @@ const getBaseUrl = () => {
     return baseUrl;
   }
   
-  // Mobile environment - use localhost (Expo dev server)
+  // Mobile environment - use the Expo dev server URL
+  // The backend should be served by the same Expo dev server
   const mobileUrl = 'http://localhost:8081';
   console.log('Using mobile base URL:', mobileUrl);
   return mobileUrl;
@@ -39,22 +40,37 @@ export const trpcClient = trpc.createClient({
         console.log('tRPC fetch:', url);
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
           
           const response = await fetch(url, {
             ...options,
             signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              ...options?.headers,
+            },
           });
           
           clearTimeout(timeoutId);
           
           if (!response.ok) {
             console.error('tRPC fetch failed:', response.status, response.statusText);
-            // Don't throw for 404s or 500s, let tRPC handle them
+            // For connection errors, provide more helpful error message
+            if (response.status === 0 || response.status >= 500) {
+              console.warn('Backend server may not be running. Using fallback mode.');
+            }
           }
           return response;
         } catch (error) {
           console.error('tRPC fetch error:', error);
+          // Provide more helpful error messages for common issues
+          if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+              console.warn('tRPC request timed out. Backend may be slow or unavailable.');
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
+              console.warn('Network error: Backend server may not be running or accessible.');
+            }
+          }
           // Re-throw to let tRPC handle the error properly
           throw error;
         }
