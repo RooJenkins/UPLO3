@@ -20,11 +20,11 @@ const getBaseUrl = () => {
     return baseUrl;
   }
   
-  // Mobile environment - use the Expo dev server URL
-  // The backend should be served by the same Expo dev server
-  const mobileUrl = 'http://localhost:8081';
-  console.log('Using mobile base URL:', mobileUrl);
-  return mobileUrl;
+  // Mobile environment - try to get the dev server URL from Expo
+  // Use the same host as the Metro bundler
+  const devServerUrl = process.env.EXPO_PUBLIC_DEV_SERVER_URL || 'http://localhost:8081';
+  console.log('Using mobile base URL:', devServerUrl);
+  return devServerUrl;
 };
 
 const baseUrl = getBaseUrl();
@@ -40,7 +40,7 @@ export const trpcClient = trpc.createClient({
         console.log('tRPC fetch:', url);
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
           
           const response = await fetch(url, {
             ...options,

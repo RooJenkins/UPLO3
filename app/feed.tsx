@@ -116,6 +116,8 @@ export default function FeedScreen() {
     );
   };
 
+
+
   // Preload status indicator
   const renderPreloadStatus = () => {
     if (!preloadedUrls) return null;
@@ -146,10 +148,10 @@ export default function FeedScreen() {
     );
   }
 
-  const statusContainerStyle = {
-    ...styles.statusContainer,
-    top: insets.top + 20,
-  };
+  const statusContainerStyle = StyleSheet.flatten([
+    styles.statusContainer,
+    { top: insets.top + 20 },
+  ]);
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>

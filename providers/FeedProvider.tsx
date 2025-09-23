@@ -295,7 +295,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           outfitId: `outfit_${Date.now()}`,
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('tRPC timeout')), 5000)
+          setTimeout(() => reject(new Error('tRPC timeout')), 8000)
         )
       ]) as any;
       
@@ -427,24 +427,24 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   }, [currentIndex, feed, queueGeneration, preloadImage]);
 
   return useMemo(() => {
-    // Always return a consistent structure
+    // Always return a consistent structure - this is critical for preventing undefined errors
     const baseReturn = {
-      feed: feed || [],
-      currentIndex,
-      setCurrentIndex,
-      isLoading: isLoading || feedQuery.isLoading,
-      isGenerating: isGenerating || generateOutfitMutation.isPending,
-      queueGeneration,
-      processQueue,
-      generateInitialFeed,
-      preloadNextOutfits,
-      generationQueue: generationQueue || [],
-      preloadedUrls: preloadedUrls || new Set(),
+      feed: Array.isArray(feed) ? feed : [],
+      currentIndex: typeof currentIndex === 'number' ? currentIndex : 0,
+      setCurrentIndex: typeof setCurrentIndex === 'function' ? setCurrentIndex : () => {},
+      isLoading: Boolean(isLoading || feedQuery?.isLoading),
+      isGenerating: Boolean(isGenerating || generateOutfitMutation?.isPending),
+      queueGeneration: typeof queueGeneration === 'function' ? queueGeneration : () => {},
+      processQueue: typeof processQueue === 'function' ? processQueue : async () => {},
+      generateInitialFeed: typeof generateInitialFeed === 'function' ? generateInitialFeed : () => {},
+      preloadNextOutfits: typeof preloadNextOutfits === 'function' ? preloadNextOutfits : () => {},
+      generationQueue: Array.isArray(generationQueue) ? generationQueue : [],
+      preloadedUrls: preloadedUrls instanceof Set ? preloadedUrls : new Set(),
       // Cloud sync status
       cloudSyncStatus: {
-        isLoading: feedQuery.isLoading,
-        isError: feedQuery.isError,
-        error: feedQuery.error,
+        isLoading: Boolean(feedQuery?.isLoading),
+        isError: Boolean(feedQuery?.isError),
+        error: feedQuery?.error || null,
       },
     };
 
@@ -484,9 +484,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     preloadNextOutfits,
     generationQueue,
     preloadedUrls,
-    feedQuery.isLoading,
-    feedQuery.isError,
-    feedQuery.error,
-    generateOutfitMutation.isPending,
+    feedQuery?.isLoading,
+    feedQuery?.isError,
+    feedQuery?.error,
+    generateOutfitMutation?.isPending,
+    setCurrentIndex,
   ]);
 });
