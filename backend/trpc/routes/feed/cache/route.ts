@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure } from "../../../create-context";
+import { publicProcedure } from "@/backend/trpc/create-context";
 
 // In-memory cache for feed entries (in production, use Redis or database)
 const feedCache = new Map<string, any>();
@@ -29,7 +29,7 @@ export const saveFeedEntryProcedure = publicProcedure
       timestamp: z.number(),
     })
   )
-  .mutation(async ({ input }) => {
+  .mutation(async ({ input }: { input: any }) => {
     try {
       // Clean up cache if it gets too large
       if (feedCache.size >= MAX_CACHE_SIZE) {
@@ -60,7 +60,7 @@ export const getFeedEntriesProcedure = publicProcedure
       outfitId: z.string().optional(),
     })
   )
-  .query(async ({ input }) => {
+  .query(async ({ input }: { input: { limit: number; outfitId?: string } }) => {
     try {
       let entries = Array.from(feedCache.values());
       

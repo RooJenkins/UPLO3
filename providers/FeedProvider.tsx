@@ -44,27 +44,21 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueue[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [storageReady, setStorageReady] = useState(false);
   const [preloadedUrls, setPreloadedUrls] = useState<Set<string>>(new Set());
   
   const storage = useStorage();
   const { getItem, setItem } = storage || {};
   
-  // Check if storage is ready
+  // Test tRPC connection on startup
   useEffect(() => {
-    if (storage && typeof getItem === 'function' && typeof setItem === 'function') {
-      setStorageReady(true);
-      
-      // Test tRPC connection on startup
-      testTrpcConnection().then(isWorking => {
-        console.log('tRPC connection test result:', isWorking);
-      }).catch(error => {
-        console.error('tRPC connection test error:', error);
-      });
-    }
-  }, [storage, getItem, setItem]);
+    testTrpcConnection().then(isWorking => {
+      console.log('tRPC connection test result:', isWorking);
+    }).catch(error => {
+      console.error('tRPC connection test error:', error);
+    });
+  }, []);
 
   // tRPC hooks with error handling and fallback
   const generateOutfitMutation = trpc.outfit.generate.useMutation({
@@ -137,7 +131,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   }, []);
 
   const saveFeedToStorage = useCallback(async (entries: FeedEntry[]) => {
-    if (!Array.isArray(entries) || entries.length > 50 || !setItem || !storageReady) return; // Validate entries
+    if (!Array.isArray(entries) || entries.length > 50 || !setItem) return; // Validate entries
     
     try {
       // Validate and clean entries aggressively - no base64 storage
@@ -176,11 +170,11 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       console.error('Failed to save feed to storage:', error);
       // Let the StorageProvider handle quota exceeded errors
     }
-  }, [setItem, getStorageSize, cleanupOldEntries, storageReady]);
+  }, [setItem, getStorageSize, cleanupOldEntries]);
 
   // Load cached feed entries on mount (local + cloud)
   useEffect(() => {
-    if (!storageReady || !getItem || isInitialized) return;
+    if (isInitialized) return;
     
     const loadCachedEntries = async () => {
       try {
@@ -188,20 +182,64 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         setIsLoading(true);
         
         // Load from local storage first for immediate display
-        const stored = await getItem(FEED_STORAGE_KEY);
-        if (stored) {
-          const entries = JSON.parse(stored);
-          if (Array.isArray(entries)) {
-            console.log(`FeedProvider: Loaded ${entries.length} local cached entries`);
-            setFeed(entries.slice(0, MAX_CACHED_ENTRIES));
-            
-            // Preload images from local cache
-            entries.slice(0, 5).forEach(entry => {
-              if (entry.imageUrl) {
-                preloadImage(entry.imageUrl);
-              }
-            });
+        if (getItem) {
+          const stored = await getItem(FEED_STORAGE_KEY);
+          if (stored) {
+            const entries = JSON.parse(stored);
+            if (Array.isArray(entries)) {
+              console.log(`FeedProvider: Loaded ${entries.length} local cached entries`);
+              setFeed(entries.slice(0, MAX_CACHED_ENTRIES));
+              
+              // Preload images from local cache
+              entries.slice(0, 5).forEach(entry => {
+                if (entry.imageUrl) {
+                  preloadImage(entry.imageUrl);
+                }
+              });
+            }
           }
+        }
+        
+        // If no cached entries, create some mock entries for immediate display
+        if (feed.length === 0) {
+          console.log('FeedProvider: No cached entries, creating mock entries');
+          const mockEntries: FeedEntry[] = [
+            {
+              id: 'mock_1',
+              imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=600&fit=crop',
+              prompt: 'Casual everyday outfit',
+              outfitId: 'mock_outfit_1',
+              items: [
+                { id: '1', name: 'White T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
+                { id: '2', name: 'Blue Jeans', brand: 'Levi\'s', price: '$89.50', category: 'bottoms' },
+              ],
+              metadata: {
+                style: 'casual',
+                occasion: 'everyday',
+                season: 'all',
+                colors: ['white', 'blue'],
+              },
+              timestamp: Date.now() - 1000,
+            },
+            {
+              id: 'mock_2',
+              imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
+              prompt: 'Business casual outfit',
+              outfitId: 'mock_outfit_2',
+              items: [
+                { id: '3', name: 'Blazer', brand: 'Zara', price: '$129.00', category: 'outerwear' },
+                { id: '4', name: 'Dress Shirt', brand: 'H&M', price: '$39.99', category: 'tops' },
+              ],
+              metadata: {
+                style: 'business',
+                occasion: 'work',
+                season: 'all',
+                colors: ['navy', 'white'],
+              },
+              timestamp: Date.now() - 2000,
+            },
+          ];
+          setFeed(mockEntries);
         }
       } catch (error) {
         console.error('Failed to load local cached feed:', error);
@@ -213,7 +251,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     };
     
     loadCachedEntries();
-  }, [storageReady, getItem, isInitialized, preloadImage]);
+  }, [getItem, isInitialized, preloadImage, feed.length]);
 
   // Sync with cloud cache when available
   useEffect(() => {
@@ -455,32 +493,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       },
     };
 
-    // If storage is not ready, return loading state but with same structure
-    if (!storageReady) {
-      console.log('FeedProvider: Storage not ready yet');
-      return {
-        feed: [],
-        currentIndex: 0,
-        setCurrentIndex: () => {},
-        isLoading: true,
-        isGenerating: false,
-        queueGeneration: () => {},
-        processQueue: async () => {},
-        generateInitialFeed: () => {},
-        preloadNextOutfits: () => {},
-        generationQueue: [],
-        preloadedUrls: new Set(),
-        cloudSyncStatus: {
-          isLoading: false,
-          isError: false,
-          error: null,
-        },
-      };
-    }
+
 
     return baseReturn;
   }, [
-    storageReady,
     feed,
     currentIndex,
     isLoading,

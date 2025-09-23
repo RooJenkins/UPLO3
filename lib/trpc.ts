@@ -131,7 +131,7 @@ export const testTrpcConnection = async () => {
     
     // Test tRPC endpoint with proper format for query
     const queryParams = new URLSearchParams({
-      input: JSON.stringify({ name: 'test' })
+      input: JSON.stringify({})
     });
     console.log('Testing tRPC endpoint:', `${trpcUrl}/example.hi?${queryParams}`);
     const testResponse = await fetch(`${trpcUrl}/example.hi?${queryParams}`, {

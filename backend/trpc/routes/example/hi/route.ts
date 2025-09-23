@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { publicProcedure } from "../../../create-context";
+import { publicProcedure } from "@/backend/trpc/create-context";
 
 export const hiProcedure = publicProcedure
-  .input(z.object({ name: z.string() }))
-  .query(({ input }) => {
+  .input(z.object({ name: z.string().optional() }).optional())
+  .query(({ input }: { input?: { name?: string } }) => {
     return {
-      hello: input.name,
+      hello: input?.name || 'World',
       date: new Date(),
+      message: 'tRPC backend is working!',
     };
   });
