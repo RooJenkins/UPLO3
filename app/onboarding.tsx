@@ -87,7 +87,7 @@ export default function OnboardingScreen() {
       };
 
       await saveUserImage(userImage);
-      router.replace('/(main)');
+      router.replace('/(main)/feed');
     } catch (error) {
       console.error('Error saving user image:', error);
       Alert.alert('Error', 'Failed to save your photo. Please try again.');
