@@ -41,7 +41,6 @@ const MAX_STORAGE_SIZE_MB = 10;
 
 
 export const [FeedProvider, useFeed] = createContextHook(() => {
-  return useMemo(() => {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueue[]>([]);
@@ -277,7 +276,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }
   }, [currentIndex, feed.length, queueGeneration]);
 
-  return {
+  return useMemo(() => ({
     feed,
     currentIndex,
     setCurrentIndex,
@@ -288,6 +287,15 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     generateInitialFeed,
     preloadNextOutfits,
     generationQueue,
-  };
-  }, []);
+  }), [
+    feed,
+    currentIndex,
+    isLoading,
+    isGenerating,
+    queueGeneration,
+    processQueue,
+    generateInitialFeed,
+    preloadNextOutfits,
+    generationQueue,
+  ]);
 });
