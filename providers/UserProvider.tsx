@@ -32,12 +32,18 @@ export const [UserProvider, useUser] = createContextHook(() => {
   }, []);
 
   const loadUserData = async () => {
+    console.log('UserProvider: Starting to load user data...');
     try {
       // Load basic user state
       const stored = await getItem(USER_STORAGE_KEY);
+      console.log('UserProvider: Stored user data:', stored);
+      
       if (stored) {
         const userData = JSON.parse(stored);
+        console.log('UserProvider: Parsed user data:', userData);
+        
         if (userData && typeof userData.isOnboarded === 'boolean') {
+          console.log('UserProvider: Setting onboarded state:', userData.isOnboarded);
           setState(prev => ({
             ...prev,
             isOnboarded: userData.isOnboarded,
@@ -46,11 +52,13 @@ export const [UserProvider, useUser] = createContextHook(() => {
           
           // Load user image separately if onboarded
           if (userData.isOnboarded) {
+            console.log('UserProvider: Loading user image...');
             const imageData = await getItem(USER_IMAGES_KEY);
             if (imageData) {
               try {
                 const parsedImage = JSON.parse(imageData);
                 if (parsedImage.originalImage) {
+                  console.log('UserProvider: Setting user image');
                   setState(prev => ({
                     ...prev,
                     userImage: parsedImage.originalImage,
@@ -64,9 +72,13 @@ export const [UserProvider, useUser] = createContextHook(() => {
           return;
         }
       }
+      
+      console.log('UserProvider: No valid stored data, setting not onboarded');
     } catch (error) {
       console.error('Failed to load user data:', error);
     }
+    
+    console.log('UserProvider: Setting loading to false');
     setState(prev => ({ ...prev, isLoading: false }));
   };
 

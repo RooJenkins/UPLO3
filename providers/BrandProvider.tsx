@@ -1,6 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
+import { useStorage } from './StorageProvider';
 
 export interface Brand {
   id: string;
@@ -27,6 +27,8 @@ const AVAILABLE_BRANDS: Brand[] = [
 export const [BrandProvider, useBrands] = createContextHook(() => {
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [availableBrands] = useState<Brand[]>(AVAILABLE_BRANDS);
+  
+  const { getItem, setItem } = useStorage();
 
   useEffect(() => {
     loadBrandPreferences();
@@ -34,7 +36,7 @@ export const [BrandProvider, useBrands] = createContextHook(() => {
 
   const loadBrandPreferences = async () => {
     try {
-      const stored = await AsyncStorage.getItem(BRAND_STORAGE_KEY);
+      const stored = await getItem(BRAND_STORAGE_KEY);
       if (stored) {
         const brandIds = JSON.parse(stored);
         if (Array.isArray(brandIds)) {
@@ -48,7 +50,7 @@ export const [BrandProvider, useBrands] = createContextHook(() => {
 
   const saveBrandPreferences = async (brands: Set<string>) => {
     try {
-      await AsyncStorage.setItem(BRAND_STORAGE_KEY, JSON.stringify(Array.from(brands)));
+      await setItem(BRAND_STORAGE_KEY, JSON.stringify(Array.from(brands)));
     } catch (error) {
       console.error('Failed to save brand preferences:', error);
     }

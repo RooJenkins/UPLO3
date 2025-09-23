@@ -88,7 +88,10 @@ export const [StorageProvider, useStorage] = createContextHook(() => {
   return useMemo(() => ({
     getItem: async (key: string): Promise<string | null> => {
       try {
-        return await AsyncStorage.getItem(key);
+        console.log(`StorageProvider: Getting item ${key}`);
+        const result = await AsyncStorage.getItem(key);
+        console.log(`StorageProvider: Got item ${key}:`, result ? 'data found' : 'no data');
+        return result;
       } catch (error) {
         console.error(`Failed to get item ${key}:`, error);
         return null;

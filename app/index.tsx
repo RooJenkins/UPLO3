@@ -1,16 +1,17 @@
 import { Redirect } from 'expo-router';
-import { useUser } from '@/providers/UserProvider';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 
 export default function IndexScreen() {
-  const { isOnboarded, isLoading } = useUser();
+  useEffect(() => {
+    // Hide splash screen after a short delay
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (isLoading) {
-    return null; // Let splash screen handle loading
-  }
-
-  if (!isOnboarded) {
-    return <Redirect href="/onboarding" />;
-  }
-
-  return <Redirect href="/(main)/feed" />;
+  // For now, always redirect to onboarding to test the app
+  return <Redirect href="/onboarding" />;
 }

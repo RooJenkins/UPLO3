@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React from "react";
+import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/providers/AppProvider";
@@ -31,20 +32,18 @@ function RootLayoutNav() {
   );
 }
 
-export default function RootLayout() {
-  useEffect(() => {
-    const hideSplash = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      await SplashScreen.hideAsync();
-    };
-    hideSplash();
-  }, []);
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
 
+export default function RootLayout() {
   return (
     <ErrorBoundary>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
+          <GestureHandlerRootView style={styles.container}>
             <AppProvider>
               <RootLayoutNav />
             </AppProvider>

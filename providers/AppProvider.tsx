@@ -14,15 +14,7 @@ export function AppProvider({ children }: AppProviderProps) {
   return (
     <StorageProvider>
       <UserProvider>
-        <FeedProvider>
-          <FavoritesProvider>
-            <BrandProvider>
-              <SearchProvider>
-                {children}
-              </SearchProvider>
-            </BrandProvider>
-          </FavoritesProvider>
-        </FeedProvider>
+        {children}
       </UserProvider>
     </StorageProvider>
   );
