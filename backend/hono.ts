@@ -17,12 +17,19 @@ app.get("/", (c) => {
 
 // Mount tRPC router - this will handle all tRPC requests
 app.use(
-  "*",
+  "/trpc/*",
   trpcServer({
-    endpoint: "/trpc",
     router: appRouter,
     createContext,
+    onError: ({ error, path }) => {
+      console.error(`tRPC Error on ${path}:`, error);
+    },
   })
 );
+
+// Add a test endpoint to verify the server is working
+app.get("/test", (c) => {
+  return c.json({ message: "Backend server is working!", timestamp: Date.now() });
+});
 
 export default app;

@@ -18,7 +18,7 @@ export const generateOutfitProcedure = publicProcedure
       outfitId: z.string().optional(),
     })
   )
-  .mutation(async ({ input }) => {
+  .mutation(async ({ input }: { input: { prompt: string; userImageBase64: string; outfitId?: string } }) => {
     const { prompt, userImageBase64, outfitId } = input;
 
     try {

@@ -1,7 +1,7 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStorage } from './StorageProvider';
-import { trpc } from '@/lib/trpc';
+import { trpc, testTrpcConnection } from '@/lib/trpc';
 
 export interface OutfitItem {
   id: string;
@@ -56,6 +56,13 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   useEffect(() => {
     if (storage && typeof getItem === 'function' && typeof setItem === 'function') {
       setStorageReady(true);
+      
+      // Test tRPC connection on startup
+      testTrpcConnection().then(isWorking => {
+        console.log('tRPC connection test result:', isWorking);
+      }).catch(error => {
+        console.error('tRPC connection test error:', error);
+      });
     }
   }, [storage, getItem, setItem]);
 
