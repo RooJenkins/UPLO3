@@ -1,5 +1,5 @@
 import { createTRPCRouter } from "./create-context";
-import hiRoute from "./routes/example/hi/route";
+import hiProcedure from "./routes/example/hi/route";
 import { generateOutfitProcedure } from "./routes/outfit/generate/route";
 import { 
   saveFeedEntryProcedure, 
@@ -9,7 +9,7 @@ import {
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
-    hi: hiRoute,
+    hi: hiProcedure,
   }),
   outfit: createTRPCRouter({
     generate: generateOutfitProcedure,
