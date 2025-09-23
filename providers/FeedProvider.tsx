@@ -158,15 +158,18 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       const data = await response.json();
       const imageData = data.image;
       
+      // Create data URL for immediate display
+      const dataUrl = `data:${imageData.mimeType};base64,${imageData.base64Data}`;
+      
       // Remove from queue and update feed
       setGenerationQueue(prev => prev.filter(item => item.prompt !== prompt));
       setIsGenerating(false);
       
-      // Add generated entry to feed
+      // Add generated entry to feed (store URL only, not base64)
       const newEntry: FeedEntry = {
         id: Date.now().toString(),
-        imageUrl: `data:${imageData.mimeType};base64,${imageData.base64Data}`,
-        base64: imageData.base64Data,
+        imageUrl: dataUrl,
+        // Don't store base64 in the entry to save memory
         prompt: prompt,
         outfitId: `outfit_${Date.now()}`,
         items: generateMockOutfitItems(),

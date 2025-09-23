@@ -1,5 +1,5 @@
 import createContextHook from '@nkzw/create-context-hook';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStorage } from './StorageProvider';
 
 interface UserImage {
@@ -27,31 +27,26 @@ export const [UserProvider, useUser] = createContextHook(() => {
   
   const { getItem, setItem, removeItem } = useStorage();
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     console.log('UserProvider: Starting to load user data...');
     try {
       // Load basic user state
       const stored = await getItem(USER_STORAGE_KEY);
       console.log('UserProvider: Stored user data:', stored);
       
+      let isOnboarded = false;
+      let userImage = null;
+      
       if (stored) {
         const userData = JSON.parse(stored);
         console.log('UserProvider: Parsed user data:', userData);
         
         if (userData && typeof userData.isOnboarded === 'boolean') {
-          console.log('UserProvider: Setting onboarded state:', userData.isOnboarded);
-          setState(prev => ({
-            ...prev,
-            isOnboarded: userData.isOnboarded,
-            isLoading: false,
-          }));
+          isOnboarded = userData.isOnboarded;
+          console.log('UserProvider: Setting onboarded state:', isOnboarded);
           
           // Load user image separately if onboarded
-          if (userData.isOnboarded) {
+          if (isOnboarded) {
             console.log('UserProvider: Loading user image...');
             const imageData = await getItem(USER_IMAGES_KEY);
             if (imageData) {
@@ -59,30 +54,39 @@ export const [UserProvider, useUser] = createContextHook(() => {
                 const parsedImage = JSON.parse(imageData);
                 if (parsedImage.originalImage) {
                   console.log('UserProvider: Setting user image');
-                  setState(prev => ({
-                    ...prev,
-                    userImage: parsedImage.originalImage,
-                  }));
+                  userImage = parsedImage.originalImage;
                 }
               } catch (imageError) {
                 console.error('Failed to parse user image:', imageError);
               }
             }
           }
-          return;
         }
       }
       
-      console.log('UserProvider: No valid stored data, setting not onboarded');
+      // Set all state at once to avoid multiple renders
+      setState({
+        isOnboarded,
+        userImage,
+        isLoading: false,
+      });
+      
+      console.log('UserProvider: Finished loading user data');
     } catch (error) {
       console.error('Failed to load user data:', error);
+      setState({
+        isOnboarded: false,
+        userImage: null,
+        isLoading: false,
+      });
     }
-    
-    console.log('UserProvider: Setting loading to false');
-    setState(prev => ({ ...prev, isLoading: false }));
-  };
+  }, [getItem]);
 
-  const saveUserImage = async (image: UserImage) => {
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
+
+  const saveUserImage = useCallback(async (image: UserImage) => {
     try {
       // Save basic state without image
       const basicState = {
@@ -113,9 +117,9 @@ export const [UserProvider, useUser] = createContextHook(() => {
       console.error('Failed to save user image:', error);
       throw error;
     }
-  };
+  }, [setItem]);
 
-  const clearUserData = async () => {
+  const clearUserData = useCallback(async () => {
     try {
       await removeItem(USER_STORAGE_KEY);
       await removeItem(USER_IMAGES_KEY);
@@ -127,11 +131,11 @@ export const [UserProvider, useUser] = createContextHook(() => {
     } catch (error) {
       console.error('Failed to clear user data:', error);
     }
-  };
+  }, [removeItem]);
 
-  return {
+  return useMemo(() => ({
     ...state,
     saveUserImage,
     clearUserData,
-  };
+  }), [state, saveUserImage, clearUserData]);
 });

@@ -27,7 +27,7 @@ export default function IndexScreen() {
   }
 
   if (isOnboarded) {
-    return <Redirect href="/(main)/feed" />;
+    return <Redirect href="/feed" />;
   }
 
   return <Redirect href="/onboarding" />;

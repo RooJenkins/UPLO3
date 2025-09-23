@@ -23,7 +23,7 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="onboarding" />
-      <Stack.Screen name="(main)" />
+      <Stack.Screen name="feed" />
       <Stack.Screen name="search" options={{ presentation: "modal" }} />
       <Stack.Screen name="brands" options={{ presentation: "modal" }} />
       <Stack.Screen name="outfit-detail" options={{ presentation: "modal" }} />
