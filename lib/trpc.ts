@@ -7,9 +7,17 @@ import { Platform } from "react-native";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
+  // First priority: Rork platform API URL from environment
   if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    console.log('Using configured API base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
+    console.log('Using Rork API base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+  }
+
+  // Second priority: Check if we're on Rork platform
+  if (typeof window !== 'undefined' && window.location.hostname.includes('rork.com')) {
+    const rorkUrl = window.location.origin;
+    console.log('Using Rork platform URL:', rorkUrl);
+    return rorkUrl;
   }
 
   // For development, use the Expo dev server URL
@@ -19,7 +27,7 @@ const getBaseUrl = () => {
     console.log('Using web base URL:', baseUrl);
     return baseUrl;
   }
-  
+
   // Mobile environment - try to get the dev server URL from Expo
   // Use the same host as the Metro bundler
   const devServerUrl = process.env.EXPO_PUBLIC_DEV_SERVER_URL || 'http://localhost:8081';
@@ -64,10 +72,18 @@ export const trpcClient = trpc.createClient({
           
           if (!response.ok) {
             const responseText = await response.text();
-            console.error('tRPC fetch failed:', response.status, response.statusText, responseText);
+            console.error('tRPC fetch failed:', response.status, {
+              url: urlString,
+              status: response.status,
+              statusText: response.statusText,
+              responseText: responseText.substring(0, 500) // Limit logged response length
+            });
+
             // For connection errors, provide more helpful error message
             if (response.status === 0 || response.status >= 500) {
-              console.warn('Backend server may not be running. Using fallback mode.');
+              console.warn('Backend server may not be running. Check server logs.');
+            } else if (response.status === 404) {
+              console.warn('tRPC endpoint not found. Check API route configuration.');
             }
           }
           return response;
