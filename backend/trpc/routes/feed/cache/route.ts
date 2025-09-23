@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure } from "@/backend/trpc/create-context";
+import { publicProcedure } from "../../../create-context";
 
 // In-memory cache for feed entries (in production, use Redis or database)
 const feedCache = new Map<string, any>();

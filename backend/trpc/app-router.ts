@@ -1,11 +1,13 @@
 import { createTRPCRouter } from "./create-context";
-import hiProcedure from "./routes/example/hi/route";
+import { hiProcedure } from "./routes/example/hi/route";
 import { generateOutfitProcedure } from "./routes/outfit/generate/route";
 import { 
   saveFeedEntryProcedure, 
   getFeedEntriesProcedure, 
   clearFeedCacheProcedure 
 } from "./routes/feed/cache/route";
+
+console.log('tRPC app-router loading...');
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -22,3 +24,5 @@ export const appRouter = createTRPCRouter({
 });
 
 export type AppRouter = typeof appRouter;
+
+console.log('tRPC app-router loaded successfully');

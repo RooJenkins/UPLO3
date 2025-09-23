@@ -1,5 +1,7 @@
 import app from '@/backend/hono';
 
+console.log('API route loaded, app:', typeof app);
+
 // Export the Hono app as the default export for Expo API routes
 export default app;
 

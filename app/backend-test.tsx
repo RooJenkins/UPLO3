@@ -32,10 +32,27 @@ export default function BackendTestScreen() {
     addResult('Testing tRPC hi procedure...');
     
     try {
-      // Use the vanilla client for testing
-      const { vanillaTrpcClient } = await import('@/lib/trpc');
-      const result = await vanillaTrpcClient.example.hi.query({ name: 'test' });
-      addResult(`tRPC hi result: ${JSON.stringify(result)}`);
+      // Test direct fetch to tRPC endpoint
+      const baseUrl = window.location.origin;
+      const trpcUrl = `${baseUrl}/api/trpc/example.hi`;
+      addResult(`Testing URL: ${trpcUrl}`);
+      
+      const response = await fetch(trpcUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "0": {
+            "json": { "name": "test" }
+          }
+        })
+      });
+      
+      addResult(`Response status: ${response.status}`);
+      const result = await response.text();
+      addResult(`Response: ${result}`);
+      
     } catch (error) {
       addResult(`tRPC hi error: ${error}`);
     }
@@ -67,6 +84,38 @@ export default function BackendTestScreen() {
     setIsLoading(false);
   };
 
+  const testApiEndpoints = async () => {
+    setIsLoading(true);
+    addResult('Testing API endpoints...');
+    
+    try {
+      const baseUrl = window.location.origin;
+      
+      // Test health endpoint
+      addResult('Testing /api/');
+      const healthResponse = await fetch(`${baseUrl}/api/`);
+      addResult(`Health status: ${healthResponse.status}`);
+      if (healthResponse.ok) {
+        const healthData = await healthResponse.text();
+        addResult(`Health response: ${healthData}`);
+      }
+      
+      // Test debug endpoint
+      addResult('Testing /api/debug');
+      const debugResponse = await fetch(`${baseUrl}/api/debug`);
+      addResult(`Debug status: ${debugResponse.status}`);
+      if (debugResponse.ok) {
+        const debugData = await debugResponse.text();
+        addResult(`Debug response: ${debugData}`);
+      }
+      
+    } catch (error) {
+      addResult(`API endpoints error: ${error}`);
+    }
+    
+    setIsLoading(false);
+  };
+
   const clearResults = () => {
     setTestResults([]);
   };
@@ -87,6 +136,14 @@ export default function BackendTestScreen() {
           disabled={isLoading}
         >
           <Text style={styles.buttonText}>Test Basic Connection</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.button, isLoading && styles.buttonDisabled]} 
+          onPress={testApiEndpoints}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>Test API Endpoints</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 

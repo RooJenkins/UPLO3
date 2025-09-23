@@ -4,6 +4,8 @@ import { cors } from "hono/cors";
 import { appRouter } from "./trpc/app-router";
 import { createContext } from "./trpc/create-context";
 
+console.log('Hono backend initializing...');
+
 // app will be mounted at /api
 const app = new Hono();
 
@@ -54,8 +56,15 @@ app.get("/debug", (c) => {
       'GET /debug',
       'ALL /trpc/*'
     ],
+    appRouter: {
+      example: { hi: 'available' },
+      outfit: { generate: 'available' },
+      feed: { save: 'available', list: 'available', clear: 'available' }
+    },
     timestamp: Date.now() 
   });
 });
+
+console.log('Hono backend initialized successfully');
 
 export default app;

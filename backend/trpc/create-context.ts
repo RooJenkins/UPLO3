@@ -2,6 +2,8 @@ import { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 
+console.log('tRPC create-context loaded successfully');
+
 // Context creation function
 export const createContext = async (opts: FetchCreateContextFnOptions) => {
   return {
