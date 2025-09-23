@@ -18,7 +18,8 @@ app.use("*", cors({
 
 // Add request logging middleware
 app.use('*', async (c, next) => {
-  console.log(`${c.req.method} ${c.req.url}`);
+  console.log(`[HONO] ${c.req.method} ${c.req.url}`);
+  console.log(`[HONO] Headers:`, Object.fromEntries(c.req.raw.headers.entries()));
   await next();
 });
 
@@ -29,16 +30,28 @@ app.get("/", (c) => {
 });
 
 // Mount tRPC router - this will handle all tRPC requests
-app.use(
-  "/trpc/*",
-  trpcServer({
+console.log('[HONO] Mounting tRPC server at /trpc/*');
+console.log('[HONO] AppRouter type:', typeof appRouter);
+console.log('[HONO] AppRouter _def:', !!appRouter._def);
+console.log('[HONO] AppRouter procedures:', Object.keys(appRouter._def?.procedures || {}));
+
+try {
+  const trpcMiddleware = trpcServer({
     router: appRouter,
     createContext,
     onError: ({ error, path }) => {
-      console.error(`tRPC Error on ${path}:`, error);
+      console.error(`[HONO] tRPC Error on ${path}:`, error);
     },
-  })
-);
+  });
+  
+  console.log('[HONO] tRPC middleware created successfully');
+  
+  app.use("/trpc/*", trpcMiddleware);
+  
+  console.log('[HONO] tRPC middleware mounted successfully');
+} catch (error) {
+  console.error('[HONO] Failed to mount tRPC middleware:', error);
+}
 
 // Add a test endpoint to verify the server is working
 app.get("/test", (c) => {

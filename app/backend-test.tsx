@@ -53,6 +53,12 @@ export default function BackendTestScreen() {
       const result = await response.text();
       addResult(`Response: ${result}`);
       
+      // Also test the vanilla client
+      addResult('Testing with vanilla tRPC client...');
+      const { vanillaTrpcClient } = await import('@/lib/trpc');
+      const vanillaResult = await vanillaTrpcClient.example.hi.query({ name: 'Vanilla Test' });
+      addResult(`Vanilla result: ${JSON.stringify(vanillaResult)}`);
+      
     } catch (error) {
       addResult(`tRPC hi error: ${error}`);
     }

@@ -64,13 +64,16 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   // tRPC hooks with error handling and fallback
   const generateOutfitMutation = trpc.outfit.generate.useMutation({
     onError: (error: any) => {
-      console.error('Generate outfit mutation error:', error);
+      console.error('[FEED] Generate outfit mutation error:', error);
       // Don't throw, let the component handle fallback
+    },
+    onSuccess: (data: any) => {
+      console.log('[FEED] Generate outfit mutation success:', data);
     },
   });
   const saveFeedMutation = trpc.feed.save.useMutation({
     onError: (error: any) => {
-      console.warn('Save feed mutation error:', error);
+      console.warn('[FEED] Save feed mutation error:', error);
       // Non-critical, continue without cloud save
     },
   });
