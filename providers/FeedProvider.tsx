@@ -1,6 +1,5 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
 import { useStorage } from './StorageProvider';
 
 export interface OutfitItem {
@@ -36,49 +35,111 @@ interface GenerationQueue {
 }
 
 const FEED_STORAGE_KEY = '@outfit_feed_cache';
-const MAX_CACHED_ENTRIES = 10;
-const MAX_STORAGE_SIZE_MB = 5;
+const MAX_CACHED_ENTRIES = 5; // Reduced from 10
 
 export const [FeedProvider, useFeed] = createContextHook(() => {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueue[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const { getItem, setItem, removeItem } = useStorage();
+  const { getItem, setItem } = useStorage();
 
-  // Load cached feed entries
-  const { data: cachedEntries, isLoading } = useQuery({
-    queryKey: ['feed-cache'],
-    queryFn: async () => {
+  // Helper functions
+  const getStorageSize = useCallback((data: string): number => {
+    return new Blob([data]).size / (1024 * 1024); // Size in MB
+  }, []);
+
+  const cleanupOldEntries = useCallback((entries: FeedEntry[]): FeedEntry[] => {
+    if (!Array.isArray(entries) || entries.length === 0) return [];
+    
+    // Sort by timestamp (newest first) and limit count
+    const sorted = entries
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, MAX_CACHED_ENTRIES);
+    
+    // Remove base64 data from ALL entries to save space - only keep URLs
+    return sorted.map((entry) => {
+      const { base64, ...entryWithoutBase64 } = entry;
+      return entryWithoutBase64;
+    });
+  }, []);
+
+  const saveFeedToStorage = useCallback(async (entries: FeedEntry[]) => {
+    if (!Array.isArray(entries)) return;
+    
+    try {
+      // Always clean entries aggressively - no base64 storage
+      let cleanedEntries = cleanupOldEntries(entries);
+      
+      // Further reduce if still too many
+      if (cleanedEntries.length > MAX_CACHED_ENTRIES) {
+        cleanedEntries = cleanedEntries.slice(0, MAX_CACHED_ENTRIES);
+      }
+      
+      // Only store essential metadata
+      const minimalEntries = cleanedEntries.map(entry => ({
+        id: entry.id,
+        imageUrl: entry.imageUrl,
+        prompt: entry.prompt,
+        outfitId: entry.outfitId,
+        timestamp: entry.timestamp,
+        // Remove heavy data
+        items: entry.items?.slice(0, 2) || [], // Keep only 2 items
+        metadata: {
+          style: entry.metadata?.style || '',
+          occasion: entry.metadata?.occasion || '',
+          season: entry.metadata?.season || '',
+          colors: entry.metadata?.colors?.slice(0, 2) || [], // Keep only 2 colors
+        },
+      }));
+      
+      const dataString = JSON.stringify(minimalEntries);
+      const storageSize = getStorageSize(dataString);
+      
+      console.log(`Saving ${minimalEntries.length} minimal entries (${storageSize.toFixed(2)}MB)`);
+      
+      await setItem(FEED_STORAGE_KEY, dataString);
+      console.log(`Successfully saved ${minimalEntries.length} entries to storage`);
+    } catch (error) {
+      console.error('Failed to save feed to storage:', error);
+      // Let the StorageProvider handle quota exceeded errors
+    }
+  }, [setItem, getStorageSize, cleanupOldEntries]);
+
+  // Load cached feed entries on mount
+  useEffect(() => {
+    const loadCachedEntries = async () => {
       try {
+        setIsLoading(true);
         const stored = await getItem(FEED_STORAGE_KEY);
         if (stored) {
           const entries = JSON.parse(stored);
           if (Array.isArray(entries)) {
-            return entries.slice(0, MAX_CACHED_ENTRIES);
+            setFeed(entries.slice(0, MAX_CACHED_ENTRIES));
           }
         }
       } catch (error) {
         console.error('Failed to load cached feed:', error);
+      } finally {
+        setIsLoading(false);
       }
-      return [];
-    },
-  });
-
-  useEffect(() => {
-    if (cachedEntries && cachedEntries.length > 0) {
-      setFeed(cachedEntries);
-    }
-  }, [cachedEntries]);
+    };
+    
+    loadCachedEntries();
+  }, [getItem]);
 
   // Generate outfit image using AI image editing
-  const generateOutfitMutation = useMutation({
-    mutationFn: async ({ prompt, userImageBase64 }: { prompt: string; userImageBase64: string }) => {
-      if (!prompt?.trim() || !userImageBase64?.trim()) {
-        throw new Error('Invalid prompt or image data');
-      }
+  const generateOutfit = useCallback(async (prompt: string, userImageBase64: string) => {
+    if (!prompt?.trim() || !userImageBase64?.trim()) {
+      console.error('Invalid prompt or image data');
+      setIsGenerating(false);
+      setGenerationQueue(prev => prev.slice(1));
+      return;
+    }
 
+    try {
       const response = await fetch('https://toolkit.rork.com/images/edit/', {
         method: 'POST',
         headers: {
@@ -95,11 +156,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       }
 
       const data = await response.json();
-      return data.image;
-    },
-    onSuccess: (imageData, variables) => {
+      const imageData = data.image;
+      
       // Remove from queue and update feed
-      setGenerationQueue(prev => prev.filter(item => item.prompt !== variables.prompt));
+      setGenerationQueue(prev => prev.filter(item => item.prompt !== prompt));
       setIsGenerating(false);
       
       // Add generated entry to feed
@@ -107,7 +167,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         id: Date.now().toString(),
         imageUrl: `data:${imageData.mimeType};base64,${imageData.base64Data}`,
         base64: imageData.base64Data,
-        prompt: variables.prompt,
+        prompt: prompt,
         outfitId: `outfit_${Date.now()}`,
         items: generateMockOutfitItems(),
         metadata: {
@@ -122,95 +182,15 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       setFeed(prev => {
         const updated = [newEntry, ...prev].slice(0, MAX_CACHED_ENTRIES);
         // Save to storage asynchronously to avoid blocking UI
-        setTimeout(() => saveFeedToStorage(updated), 100);
+        setTimeout(() => saveFeedToStorage(updated), 500);
         return updated;
       });
-    },
-    onError: (error) => {
+    } catch (error) {
       console.error('Failed to generate outfit:', error);
       setIsGenerating(false);
       setGenerationQueue(prev => prev.slice(1)); // Remove failed item
-    },
-  });
-
-  const getStorageSize = (data: string): number => {
-    return new Blob([data]).size / (1024 * 1024); // Size in MB
-  };
-
-  const cleanupOldEntries = (entries: FeedEntry[]): FeedEntry[] => {
-    if (!Array.isArray(entries) || entries.length === 0) return [];
-    
-    // Sort by timestamp (newest first) and limit count
-    const sorted = entries
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, MAX_CACHED_ENTRIES);
-    
-    // Remove base64 data from older entries to save space
-    return sorted.map((entry, index) => {
-      if (index > 3) { // Keep base64 only for recent 3 entries
-        const { base64, ...entryWithoutBase64 } = entry;
-        return entryWithoutBase64;
-      }
-      return entry;
-    });
-  };
-
-  const saveFeedToStorage = async (entries: FeedEntry[]) => {
-    if (!Array.isArray(entries)) return;
-    
-    try {
-      let cleanedEntries = cleanupOldEntries(entries);
-      let dataString = JSON.stringify(cleanedEntries);
-      let storageSize = getStorageSize(dataString);
-      
-      console.log(`Attempting to save ${cleanedEntries.length} entries (${storageSize.toFixed(2)}MB)`);
-      
-      // If still too large, progressively reduce entries
-      while (storageSize > MAX_STORAGE_SIZE_MB && cleanedEntries.length > 3) {
-        cleanedEntries = cleanedEntries.slice(0, Math.floor(cleanedEntries.length * 0.7));
-        // Remove base64 from remaining entries
-        cleanedEntries = cleanedEntries.map(entry => {
-          const { base64, ...entryWithoutBase64 } = entry;
-          return entryWithoutBase64;
-        });
-        dataString = JSON.stringify(cleanedEntries);
-        storageSize = getStorageSize(dataString);
-        console.log(`Reduced to ${cleanedEntries.length} entries (${storageSize.toFixed(2)}MB)`);
-      }
-      
-      await setItem(FEED_STORAGE_KEY, dataString);
-      console.log(`Successfully saved ${cleanedEntries.length} entries to storage`);
-    } catch (error) {
-      console.error('Failed to save feed to storage:', error);
-      
-      // If quota exceeded, try emergency cleanup
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
-        try {
-          console.log('Quota exceeded, performing emergency cleanup...');
-          // Keep only the most recent 3 entries without base64
-          const emergencyEntries = entries
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, 3)
-            .map(entry => {
-              const { base64, ...entryWithoutBase64 } = entry;
-              return entryWithoutBase64;
-            });
-          
-          await setItem(FEED_STORAGE_KEY, JSON.stringify(emergencyEntries));
-          console.log('Emergency cleanup successful');
-        } catch (emergencyError) {
-          console.error('Emergency cleanup failed:', emergencyError);
-          // Clear the storage completely as last resort
-          try {
-            await removeItem(FEED_STORAGE_KEY);
-            console.log('Storage cleared completely');
-          } catch (clearError) {
-            console.error('Failed to clear storage:', clearError);
-          }
-        }
-      }
     }
-  };
+  }, [saveFeedToStorage]);
 
   const generateMockOutfitItems = (): OutfitItem[] => {
     const mockItems = [
@@ -235,8 +215,6 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     });
   }, []);
 
-  const { mutate: generateOutfit } = generateOutfitMutation;
-  
   const processQueue = useCallback(async (userImageBase64: string) => {
     if (isGenerating || generationQueue.length === 0 || !userImageBase64?.trim()) return;
     
@@ -244,10 +222,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     if (!nextItem) return;
     
     setIsGenerating(true);
-    generateOutfit({
-      prompt: nextItem.prompt,
-      userImageBase64,
-    });
+    await generateOutfit(nextItem.prompt, userImageBase64);
   }, [isGenerating, generationQueue, generateOutfit]);
 
   const generateInitialFeed = useCallback((userImageBase64: string) => {
