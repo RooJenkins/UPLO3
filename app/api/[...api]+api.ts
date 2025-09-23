@@ -3,10 +3,33 @@ import app from '@/backend/hono';
 // Export the Hono app as the default export for Expo API routes
 export default app;
 
-// Handle all HTTP methods
-export const GET = app.fetch;
-export const POST = app.fetch;
-export const PUT = app.fetch;
-export const DELETE = app.fetch;
-export const PATCH = app.fetch;
-export const OPTIONS = app.fetch;
+// Handle all HTTP methods by creating proper Request objects
+export async function GET(request: Request) {
+  console.log('API GET request:', request.url);
+  return app.fetch(request);
+}
+
+export async function POST(request: Request) {
+  console.log('API POST request:', request.url);
+  return app.fetch(request);
+}
+
+export async function PUT(request: Request) {
+  console.log('API PUT request:', request.url);
+  return app.fetch(request);
+}
+
+export async function DELETE(request: Request) {
+  console.log('API DELETE request:', request.url);
+  return app.fetch(request);
+}
+
+export async function PATCH(request: Request) {
+  console.log('API PATCH request:', request.url);
+  return app.fetch(request);
+}
+
+export async function OPTIONS(request: Request) {
+  console.log('API OPTIONS request:', request.url);
+  return app.fetch(request);
+}

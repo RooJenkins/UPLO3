@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Upload, Sparkles } from 'lucide-react-native';
+import { Camera, Upload, Sparkles, Settings } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useUser } from '@/providers/UserProvider';
@@ -104,6 +104,12 @@ export default function OnboardingScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.debugButton}
+              onPress={() => router.push('/backend-test')}
+            >
+              <Settings size={20} color="#fff" />
+            </TouchableOpacity>
             <Sparkles size={48} color="#fff" />
             <Text style={styles.title}>Your Style Journey</Text>
             <Text style={styles.subtitle}>
@@ -178,6 +184,14 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: 40,
+    position: 'relative',
+  },
+  debugButton: {
+    position: 'absolute',
+    top: -20,
+    right: 0,
+    padding: 10,
+    opacity: 0.7,
   },
   title: {
     fontSize: 32,

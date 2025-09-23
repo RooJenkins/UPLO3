@@ -28,6 +28,7 @@ function RootLayoutNav() {
       <Stack.Screen name="brands" options={{ presentation: "modal" }} />
       <Stack.Screen name="outfit-detail" options={{ presentation: "modal" }} />
       <Stack.Screen name="image-viewer" options={{ presentation: "modal" }} />
+      <Stack.Screen name="backend-test" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
