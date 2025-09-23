@@ -2,21 +2,35 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   FlatList,
-  Dimensions,
   StyleSheet,
   Platform,
+  Text,
+  useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeed, FeedEntry } from '@/providers/FeedProvider';
 import { useUser } from '@/providers/UserProvider';
 import { FeedCard } from '@/components/FeedCard';
 import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { LoadingCard } from '@/components/LoadingCard';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { Wifi, Cloud, CloudOff } from 'lucide-react-native';
 
 export default function FeedScreen() {
-  const { feed, currentIndex, setCurrentIndex, isLoading, processQueue, generateInitialFeed, preloadNextOutfits } = useFeed();
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  
+  const { 
+    feed, 
+    currentIndex, 
+    setCurrentIndex, 
+    isLoading, 
+    processQueue, 
+    generateInitialFeed, 
+    preloadNextOutfits,
+    preloadedUrls,
+    cloudSyncStatus,
+  } = useFeed();
   const { userImage } = useUser();
   const [hasScrolled, setHasScrolled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -66,23 +80,79 @@ export default function FeedScreen() {
 
   // Add loading cards to the feed for smooth UX
   const displayFeed: (FeedEntry | { id: string; isGenerating: true })[] = [...feed];
-  if (feed.length < 5) {
-    for (let i = feed.length; i < 5; i++) {
+  if (feed.length < 8) { // Increased for better preloading
+    for (let i = feed.length; i < 8; i++) {
       displayFeed.push({ id: `loading_${i}`, isGenerating: true });
     }
   }
 
+  // Cloud sync status indicator
+  const renderCloudStatus = () => {
+    if (!cloudSyncStatus) return null;
+    
+    if (cloudSyncStatus.isLoading) {
+      return (
+        <View style={styles.cloudStatus}>
+          <Cloud size={16} color="#666" />
+          <Text style={styles.cloudStatusText}>Syncing...</Text>
+        </View>
+      );
+    }
+    
+    if (cloudSyncStatus.isError) {
+      return (
+        <View style={styles.cloudStatus}>
+          <CloudOff size={16} color="#ff6b6b" />
+          <Text style={styles.errorStatusText}>Offline</Text>
+        </View>
+      );
+    }
+    
+    return (
+      <View style={styles.cloudStatus}>
+        <Cloud size={16} color="#4ecdc4" />
+        <Text style={styles.successStatusText}>Cloud</Text>
+      </View>
+    );
+  };
+
+  // Preload status indicator
+  const renderPreloadStatus = () => {
+    if (!preloadedUrls) return null;
+    
+    const preloadedCount = preloadedUrls.size;
+    const totalImages = Math.min(feed.length, 5);
+    
+    if (preloadedCount > 0) {
+      return (
+        <View style={styles.preloadStatus}>
+          <Wifi size={16} color="#4ecdc4" />
+          <Text style={styles.successStatusText}>
+            {preloadedCount}/{totalImages}
+          </Text>
+        </View>
+      );
+    }
+    
+    return null;
+  };
+
   if (isLoading && feed.length === 0) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <LoadingCard />
         <StatusBar style="light" />
-      </View>
+      </SafeAreaView>
     );
   }
 
+  const statusContainerStyle = {
+    ...styles.statusContainer,
+    top: insets.top + 20,
+  };
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <FlatList
         ref={flatListRef}
         data={displayFeed}
@@ -97,15 +167,20 @@ export default function FeedScreen() {
         viewabilityConfig={viewabilityConfig}
         getItemLayout={getItemLayout}
         removeClippedSubviews={Platform.OS === 'android'}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        initialNumToRender={1}
         style={styles.flatList}
       />
       
+      <View style={statusContainerStyle}>
+        {renderCloudStatus()}
+        {renderPreloadStatus()}
+      </View>
+      
       {!hasScrolled && <SwipeIndicator />}
       <StatusBar style="light" />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -116,5 +191,44 @@ const styles = StyleSheet.create({
   },
   flatList: {
     flex: 1,
+  },
+  statusContainer: {
+    position: 'absolute',
+    right: 20,
+    flexDirection: 'column',
+    gap: 8,
+  },
+  cloudStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  preloadStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  cloudStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  errorStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff6b6b',
+  },
+  successStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4ecdc4',
   },
 });
