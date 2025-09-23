@@ -36,9 +36,8 @@ interface GenerationQueue {
 }
 
 const FEED_STORAGE_KEY = '@outfit_feed_cache';
-const MAX_CACHED_ENTRIES = 20;
-const MAX_STORAGE_SIZE_MB = 10;
-
+const MAX_CACHED_ENTRIES = 10;
+const MAX_STORAGE_SIZE_MB = 5;
 
 export const [FeedProvider, useFeed] = createContextHook(() => {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
@@ -73,17 +72,21 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }
   }, [cachedEntries]);
 
-  // Generate outfit image using AI
+  // Generate outfit image using AI image editing
   const generateOutfitMutation = useMutation({
     mutationFn: async ({ prompt, userImageBase64 }: { prompt: string; userImageBase64: string }) => {
-      const response = await fetch('https://toolkit.rork.com/images/generate/', {
+      if (!prompt?.trim() || !userImageBase64?.trim()) {
+        throw new Error('Invalid prompt or image data');
+      }
+
+      const response = await fetch('https://toolkit.rork.com/images/edit/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: `${prompt}. Full body shot with space around feet and head. High-end fashion photography, studio lighting, professional model pose. The person should look exactly like the reference image provided.`,
-          size: '1024x1024',
+          prompt: `Change the person's outfit to: ${prompt.trim()}. Keep the person's face, body shape, and pose exactly the same. Only change the clothing. Full body shot with space around feet and head. High-end fashion photography, studio lighting, professional model pose.`,
+          images: [{ type: 'image', image: userImageBase64 }],
         }),
       });
 
@@ -135,6 +138,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   };
 
   const cleanupOldEntries = (entries: FeedEntry[]): FeedEntry[] => {
+    if (!Array.isArray(entries) || entries.length === 0) return [];
+    
     // Sort by timestamp (newest first) and limit count
     const sorted = entries
       .sort((a, b) => b.timestamp - a.timestamp)
@@ -142,7 +147,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     
     // Remove base64 data from older entries to save space
     return sorted.map((entry, index) => {
-      if (index > 10) { // Keep base64 only for recent 10 entries
+      if (index > 3) { // Keep base64 only for recent 3 entries
         const { base64, ...entryWithoutBase64 } = entry;
         return entryWithoutBase64;
       }
@@ -151,6 +156,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   };
 
   const saveFeedToStorage = async (entries: FeedEntry[]) => {
+    if (!Array.isArray(entries)) return;
+    
     try {
       let cleanedEntries = cleanupOldEntries(entries);
       let dataString = JSON.stringify(cleanedEntries);
@@ -159,8 +166,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       console.log(`Attempting to save ${cleanedEntries.length} entries (${storageSize.toFixed(2)}MB)`);
       
       // If still too large, progressively reduce entries
-      while (storageSize > MAX_STORAGE_SIZE_MB && cleanedEntries.length > 5) {
-        cleanedEntries = cleanedEntries.slice(0, Math.floor(cleanedEntries.length * 0.8));
+      while (storageSize > MAX_STORAGE_SIZE_MB && cleanedEntries.length > 3) {
+        cleanedEntries = cleanedEntries.slice(0, Math.floor(cleanedEntries.length * 0.7));
         // Remove base64 from remaining entries
         cleanedEntries = cleanedEntries.map(entry => {
           const { base64, ...entryWithoutBase64 } = entry;
@@ -180,10 +187,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         try {
           console.log('Quota exceeded, performing emergency cleanup...');
-          // Keep only the most recent 5 entries without base64
+          // Keep only the most recent 3 entries without base64
           const emergencyEntries = entries
             .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, 5)
+            .slice(0, 3)
             .map(entry => {
               const { base64, ...entryWithoutBase64 } = entry;
               return entryWithoutBase64;
@@ -231,7 +238,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const { mutate: generateOutfit } = generateOutfitMutation;
   
   const processQueue = useCallback(async (userImageBase64: string) => {
-    if (isGenerating || generationQueue.length === 0) return;
+    if (isGenerating || generationQueue.length === 0 || !userImageBase64?.trim()) return;
     
     const nextItem = generationQueue[0];
     if (!nextItem) return;
@@ -244,6 +251,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   }, [isGenerating, generationQueue, generateOutfit]);
 
   const generateInitialFeed = useCallback((userImageBase64: string) => {
+    if (!userImageBase64?.trim()) return;
+    
     const prompts = [
       'Casual everyday outfit with jeans and sneakers',
       'Business casual outfit with blazer',
@@ -260,20 +269,20 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   }, [queueGeneration]);
 
   const preloadNextOutfits = useCallback((userImageBase64: string) => {
-    if (currentIndex >= feed.length - 2) {
-      const newPrompts = [
-        'Trendy street style outfit',
-        'Professional work outfit',
-        'Cozy winter outfit with layers',
-        'Summer beach outfit, light and breezy',
-      ];
-      
-      newPrompts.forEach(prompt => {
-        if (prompt?.trim()) {
-          queueGeneration(prompt.trim(), 1);
-        }
-      });
-    }
+    if (!userImageBase64?.trim() || currentIndex < feed.length - 2) return;
+    
+    const newPrompts = [
+      'Trendy street style outfit',
+      'Professional work outfit',
+      'Cozy winter outfit with layers',
+      'Summer beach outfit, light and breezy',
+    ];
+    
+    newPrompts.forEach(prompt => {
+      if (prompt?.trim()) {
+        queueGeneration(prompt.trim(), 1);
+      }
+    });
   }, [currentIndex, feed.length, queueGeneration]);
 
   return useMemo(() => ({
