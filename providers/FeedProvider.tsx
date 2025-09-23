@@ -40,6 +40,7 @@ const MAX_CACHED_ENTRIES = 15; // Increased for URL-based storage
 const PRELOAD_THRESHOLD = 3; // Start preloading when 3 items from end
 
 export const [FeedProvider, useFeed] = createContextHook(() => {
+  console.log('FeedProvider: Initializing context hook...');
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueue[]>([]);
@@ -76,8 +77,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const feedQuery = trpc.feed.list.useQuery(
     { limit: MAX_CACHED_ENTRIES },
     { 
-      enabled: isInitialized,
-      retry: false, // Don't retry to avoid blocking
+      enabled: false, // Disable cloud sync for now to prevent blocking
+      retry: false,
       retryDelay: 1000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
@@ -181,14 +182,18 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         console.log('FeedProvider: Loading cached entries from local storage...');
         setIsLoading(true);
         
-        // Load from local storage first for immediate display
+        // This will be handled below in the combined logic
+        
+        // Always create some mock entries for immediate display if no cached entries
+        let currentFeed = feed;
         if (getItem) {
           const stored = await getItem(FEED_STORAGE_KEY);
           if (stored) {
             const entries = JSON.parse(stored);
-            if (Array.isArray(entries)) {
+            if (Array.isArray(entries) && entries.length > 0) {
               console.log(`FeedProvider: Loaded ${entries.length} local cached entries`);
-              setFeed(entries.slice(0, MAX_CACHED_ENTRIES));
+              currentFeed = entries.slice(0, MAX_CACHED_ENTRIES);
+              setFeed(currentFeed);
               
               // Preload images from local cache
               entries.slice(0, 5).forEach(entry => {
@@ -200,8 +205,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           }
         }
         
-        // If no cached entries, create some mock entries for immediate display
-        if (feed.length === 0) {
+        // If still no cached entries, create mock entries for immediate display
+        if (currentFeed.length === 0) {
           console.log('FeedProvider: No cached entries, creating mock entries');
           const mockEntries: FeedEntry[] = [
             {
@@ -238,6 +243,23 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
               },
               timestamp: Date.now() - 2000,
             },
+            {
+              id: 'mock_3',
+              imageUrl: 'https://images.unsplash.com/photo-1506629905607-c28b47d3e6b0?w=400&h=600&fit=crop',
+              prompt: 'Weekend casual outfit',
+              outfitId: 'mock_outfit_3',
+              items: [
+                { id: '5', name: 'Hoodie', brand: 'Nike', price: '$65.00', category: 'tops' },
+                { id: '6', name: 'Joggers', brand: 'Adidas', price: '$55.00', category: 'bottoms' },
+              ],
+              metadata: {
+                style: 'sporty',
+                occasion: 'weekend',
+                season: 'all',
+                colors: ['gray', 'black'],
+              },
+              timestamp: Date.now() - 3000,
+            },
           ];
           setFeed(mockEntries);
         }
@@ -251,7 +273,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     };
     
     loadCachedEntries();
-  }, [getItem, isInitialized, preloadImage, feed.length]);
+  }, [getItem, isInitialized, preloadImage]);
 
   // Sync with cloud cache when available
   useEffect(() => {
@@ -471,7 +493,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     });
   }, [currentIndex, feed, queueGeneration, preloadImage]);
 
-  return useMemo(() => {
+  const contextValue = useMemo(() => {
+    console.log('FeedProvider: Creating context value, feed length:', feed.length);
     // Always return a consistent structure - this is critical for preventing undefined errors
     const baseReturn = {
       feed: Array.isArray(feed) ? feed : [],
@@ -495,6 +518,12 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
 
 
 
+    console.log('FeedProvider: Returning context value:', {
+      feedLength: baseReturn.feed.length,
+      isLoading: baseReturn.isLoading,
+      isGenerating: baseReturn.isGenerating,
+      currentIndex: baseReturn.currentIndex
+    });
     return baseReturn;
   }, [
     feed,
@@ -513,4 +542,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     generateOutfitMutation?.isPending,
     setCurrentIndex,
   ]);
+  
+  console.log('FeedProvider: Context hook initialized, returning value');
+  return contextValue;
 });

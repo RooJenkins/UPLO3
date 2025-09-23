@@ -157,6 +157,26 @@ export const vanillaTrpcClient = trpc.createClient({
     httpLink({
       url: trpcUrl,
       transformer: superjson,
+      fetch: async (url, options) => {
+        const urlString = typeof url === 'string' ? url : url.toString();
+        console.log('Vanilla tRPC fetch:', urlString);
+        
+        try {
+          const response = await fetch(url, {
+            ...options,
+            headers: {
+              'Content-Type': 'application/json',
+              ...options?.headers,
+            },
+          });
+          
+          console.log('Vanilla tRPC response:', response.status, response.statusText);
+          return response;
+        } catch (error) {
+          console.error('Vanilla tRPC fetch error:', error);
+          throw error;
+        }
+      },
     }),
   ],
 });
@@ -192,26 +212,36 @@ export const testTrpcConnection = async () => {
     }
     
     // Test tRPC endpoint with proper format for query
-    const queryParams = new URLSearchParams({
-      input: JSON.stringify({})
-    });
-    console.log('Testing tRPC endpoint:', `${trpcUrl}/example.hi?${queryParams}`);
-    const testResponse = await fetch(`${trpcUrl}/example.hi?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    console.log('tRPC test response:', testResponse.status, testResponse.statusText);
-    
-    if (testResponse.ok) {
-      const testData = await testResponse.json();
-      console.log('tRPC test data:', testData);
+    console.log('Testing tRPC endpoint with vanilla client...');
+    try {
+      const result = await vanillaTrpcClient.example.hi.query({ name: 'Connection Test' });
+      console.log('Vanilla tRPC test successful:', result);
       return true;
-    } else {
-      const errorText = await testResponse.text();
-      console.error('tRPC test failed:', errorText);
+    } catch (trpcError) {
+      console.error('Vanilla tRPC test failed:', trpcError);
+      
+      // Fallback to direct HTTP test
+      const queryParams = new URLSearchParams({
+        input: JSON.stringify({})
+      });
+      console.log('Testing tRPC endpoint directly:', `${trpcUrl}/example.hi?${queryParams}`);
+      const testResponse = await fetch(`${trpcUrl}/example.hi?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    
+      console.log('Direct tRPC test response:', testResponse.status, testResponse.statusText);
+      
+      if (testResponse.ok) {
+        const testData = await testResponse.json();
+        console.log('Direct tRPC test data:', testData);
+        return true;
+      } else {
+        const errorText = await testResponse.text();
+        console.error('Direct tRPC test failed:', errorText);
+      }
     }
     
     return false;
