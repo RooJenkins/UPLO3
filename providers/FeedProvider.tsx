@@ -39,9 +39,47 @@ const FEED_STORAGE_KEY = '@outfit_feed_cache';
 const MAX_CACHED_ENTRIES = 15; // Increased for URL-based storage
 const PRELOAD_THRESHOLD = 3; // Start preloading when 3 items from end
 
+// Create initial mock data to prevent black screen
+const createMockFeedEntries = (): FeedEntry[] => [
+  {
+    id: 'initial_mock_1',
+    imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=600&fit=crop',
+    prompt: 'Casual everyday outfit',
+    outfitId: 'initial_outfit_1',
+    items: [
+      { id: '1', name: 'White T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
+      { id: '2', name: 'Blue Jeans', brand: 'Levi\'s', price: '$89.50', category: 'bottoms' },
+    ],
+    metadata: {
+      style: 'casual',
+      occasion: 'everyday', 
+      season: 'all',
+      colors: ['white', 'blue'],
+    },
+    timestamp: Date.now() - 1000,
+  },
+  {
+    id: 'initial_mock_2',
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
+    prompt: 'Business casual outfit',
+    outfitId: 'initial_outfit_2',
+    items: [
+      { id: '3', name: 'Blazer', brand: 'Zara', price: '$129.00', category: 'outerwear' },
+      { id: '4', name: 'Dress Shirt', brand: 'H&M', price: '$39.99', category: 'tops' },
+    ],
+    metadata: {
+      style: 'business',
+      occasion: 'work',
+      season: 'all',
+      colors: ['navy', 'white'],
+    },
+    timestamp: Date.now() - 2000,
+  },
+];
+
 export const [FeedProvider, useFeed] = createContextHook(() => {
   console.log('FeedProvider: Initializing context hook...');
-  const [feed, setFeed] = useState<FeedEntry[]>([]);
+  const [feed, setFeed] = useState<FeedEntry[]>(createMockFeedEntries()); // Start with mock data
   const [currentIndex, setCurrentIndex] = useState(0);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueue[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -208,63 +246,11 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           }
         }
         
-        // If still no cached entries, create mock entries for immediate display
+        // Ensure we always have at least the initial mock data
         if (currentFeed.length === 0) {
-          console.log('FeedProvider: No cached entries, creating mock entries');
-          const mockEntries: FeedEntry[] = [
-            {
-              id: 'mock_1',
-              imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=600&fit=crop',
-              prompt: 'Casual everyday outfit',
-              outfitId: 'mock_outfit_1',
-              items: [
-                { id: '1', name: 'White T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
-                { id: '2', name: 'Blue Jeans', brand: 'Levi\'s', price: '$89.50', category: 'bottoms' },
-              ],
-              metadata: {
-                style: 'casual',
-                occasion: 'everyday',
-                season: 'all',
-                colors: ['white', 'blue'],
-              },
-              timestamp: Date.now() - 1000,
-            },
-            {
-              id: 'mock_2',
-              imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
-              prompt: 'Business casual outfit',
-              outfitId: 'mock_outfit_2',
-              items: [
-                { id: '3', name: 'Blazer', brand: 'Zara', price: '$129.00', category: 'outerwear' },
-                { id: '4', name: 'Dress Shirt', brand: 'H&M', price: '$39.99', category: 'tops' },
-              ],
-              metadata: {
-                style: 'business',
-                occasion: 'work',
-                season: 'all',
-                colors: ['navy', 'white'],
-              },
-              timestamp: Date.now() - 2000,
-            },
-            {
-              id: 'mock_3',
-              imageUrl: 'https://images.unsplash.com/photo-1506629905607-c28b47d3e6b0?w=400&h=600&fit=crop',
-              prompt: 'Weekend casual outfit',
-              outfitId: 'mock_outfit_3',
-              items: [
-                { id: '5', name: 'Hoodie', brand: 'Nike', price: '$65.00', category: 'tops' },
-                { id: '6', name: 'Joggers', brand: 'Adidas', price: '$55.00', category: 'bottoms' },
-              ],
-              metadata: {
-                style: 'sporty',
-                occasion: 'weekend',
-                season: 'all',
-                colors: ['gray', 'black'],
-              },
-              timestamp: Date.now() - 3000,
-            },
-          ];
-          setFeed(mockEntries);
+          console.log('FeedProvider: Using initial mock entries');
+          currentFeed = createMockFeedEntries();
+          setFeed(currentFeed);
         }
       } catch (error) {
         console.error('Failed to load local cached feed:', error);
