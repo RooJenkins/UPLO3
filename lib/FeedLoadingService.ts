@@ -36,23 +36,37 @@ export class FeedLoadingService {
   private workerStats: Map<string, WorkerStats> = new Map();
 
   // Configuration
-  private readonly MAX_WORKERS = 10;
+  private readonly MAX_WORKERS = 30;
   private readonly PRELOAD_AHEAD = 20;
   private readonly CACHE_BEHIND = 10;
   private readonly MAX_RETRIES = 2;
   private readonly CACHE_SIZE_LIMIT = 100; // Total images to keep in memory (increased for better UX)
+
+  // Continuous Generation Configuration
+  private readonly BUFFER_TARGET = 100; // Always aim to have 100 images ready
+  private readonly GENERATION_TRIGGER_DISTANCE = 50; // Start generating when 50 images from end
+  private readonly BATCH_SIZE = 20; // Generate in batches of 20
+  private readonly CONTINUOUS_CHECK_INTERVAL = 5000; // Check every 5 seconds
 
   // Scroll prediction
   private scrollVelocity = 0;
   private lastScrollPosition = 0;
   private scrollDirection: 'up' | 'down' = 'down';
 
+  // Continuous generation state
+  private maxGeneratedPosition = 0;
+  private continuousGenerationEnabled = false;
+  private backgroundGenerationTimer: NodeJS.Timeout | null = null;
+  private userImageBase64: string | null = null;
+
   constructor() {
+    console.log('[LOADING] 🚀 Initializing FeedLoadingService with 30 parallel workers');
     this.initializeWorkers();
+    this.startContinuousGeneration();
   }
 
   private initializeWorkers() {
-    console.log('[LOADING] Initializing', this.MAX_WORKERS, 'parallel workers');
+    console.log('[LOADING] 🔧 Initializing', this.MAX_WORKERS, 'parallel workers for maximum throughput');
 
     for (let i = 0; i < this.MAX_WORKERS; i++) {
       const workerId = `worker_${i}`;
@@ -165,8 +179,18 @@ export class FeedLoadingService {
 
       const result = await this.generateImage(job);
 
-      // Cache the result
+      // Cache the result with validation to prevent duplicates
+      if (this.imageCache.has(job.position)) {
+        console.warn('[WORKER] ⚠️ Position already cached, potential duplicate:', {
+          workerId,
+          position: job.position,
+          existingId: this.imageCache.get(job.position)?.id,
+          newId: result.id
+        });
+      }
+
       this.imageCache.set(job.position, result);
+      console.log('[WORKER] ✅ Cached image at position', job.position, 'ID:', result.id.substring(0, 12));
 
       // Preload the image for instant display
       await this.preloadImage(result.imageUrl);
@@ -198,6 +222,11 @@ export class FeedLoadingService {
 
       // Continue processing queue
       setTimeout(() => this.processQueue(), 100);
+
+      // Update max generated position
+      if (job.position > this.maxGeneratedPosition) {
+        this.maxGeneratedPosition = job.position;
+      }
     }
   }
 
@@ -248,9 +277,11 @@ export class FeedLoadingService {
   }
 
   /**
-   * Intelligent preloading based on scroll patterns
+   * Enhanced intelligent preloading with continuous generation awareness
    */
   private scheduleIntelligentPreload(currentIndex: number) {
+    if (!this.userImageBase64) return;
+
     // Calculate adaptive preload distance based on scroll velocity
     const velocityMultiplier = Math.min(Math.abs(this.scrollVelocity) * 2, 10);
     const adaptivePreload = Math.max(this.PRELOAD_AHEAD + velocityMultiplier, 25);
@@ -285,27 +316,74 @@ export class FeedLoadingService {
     }
 
     if (jobs.length > 0) {
-      // We need userImageBase64 - this should be passed from the component
-      console.log('[PRELOAD] Scheduling', jobs.length, 'intelligent preload jobs');
-      // Note: We'll need to get userImageBase64 from the calling component
+      console.log('[PRELOAD] 🧠 Scheduling', jobs.length, 'intelligent preload jobs');
+      this.queueJobs(jobs, this.userImageBase64);
+    }
+
+    // Trigger continuous generation check
+    if (this.continuousGenerationEnabled) {
+      setTimeout(() => this.maintainBuffer(), 1000);
     }
   }
 
   /**
-   * Get prompt for feed position
+   * Get highly varied prompt for feed position to ensure unique images
    */
   private getPromptForPosition(position: number): string {
-    const prompts = [
+    const baseStyles = [
       'casual summer outfit', 'business professional attire', 'trendy streetwear look',
       'elegant evening wear', 'cozy weekend outfit', 'vintage inspired outfit',
       'athletic wear ensemble', 'minimalist chic style', 'bohemian fashion look',
       'smart casual attire', 'formal dinner outfit', 'beach vacation style',
       'urban explorer look', 'romantic date night', 'creative artist vibe',
       'power lunch ensemble', 'festival fashion', 'winter cozy layers',
-      'spring fresh style', 'autumn earth tones'
+      'spring fresh style', 'autumn earth tones', 'gothic alternative',
+      'preppy collegiate', 'edgy punk rock', 'sophisticated luxury',
+      'comfort loungewear', 'adventure outdoor', 'artistic bohemian',
+      'retro vintage', 'futuristic modern', 'classic timeless',
+      'sporty casual', 'elegant cocktail', 'boho chic', 'minimalist modern',
+      'romantic feminine', 'edgy contemporary', 'professional casual',
+      'vacation resort', 'city night out', 'weekend relaxed',
+      'formal business', 'trendy fashion forward', 'comfortable stylish'
     ];
 
-    return prompts[position % prompts.length];
+    const colors = ['black', 'white', 'navy', 'red', 'pink', 'green', 'blue', 'purple', 'yellow', 'orange', 'gray', 'brown', 'beige'];
+    const modifiers = ['modern', 'vintage', 'stylish', 'comfortable', 'elegant', 'casual', 'edgy', 'feminine', 'minimalist', 'bold'];
+    const accessories = ['with belt', 'with hat', 'with jacket', 'with scarf', 'with jewelry', 'with sunglasses', 'with bag', ''];
+
+    // Create highly unique combinations using position for deterministic but varied results
+    const baseIndex = position % baseStyles.length;
+    const colorIndex = Math.floor(position / baseStyles.length) % colors.length;
+    const modifierIndex = Math.floor(position / (baseStyles.length * colors.length)) % modifiers.length;
+    const accessoryIndex = Math.floor(position / (baseStyles.length * colors.length * modifiers.length)) % accessories.length;
+
+    const baseStyle = baseStyles[baseIndex];
+    const color = colors[colorIndex];
+    const modifier = modifiers[modifierIndex];
+    const accessory = accessories[accessoryIndex];
+
+    // Generate unique prompt with position identifier for debugging
+    let prompt = `${modifier} ${color} ${baseStyle}`;
+    if (accessory) {
+      prompt += ` ${accessory}`;
+    }
+
+    // Add position-based uniqueness for extra variety
+    const uniqueElements = [
+      'with unique styling',
+      'trendy fashion',
+      'designer look',
+      'street style',
+      'fashion forward',
+      'contemporary design',
+      'modern aesthetic',
+      'stylish appearance'
+    ];
+
+    prompt += `, ${uniqueElements[position % uniqueElements.length]}`;
+
+    console.log(`[PROMPT] Position ${position}: "${prompt}"`);
+    return prompt;
   }
 
   /**
@@ -348,10 +426,147 @@ export class FeedLoadingService {
   }
 
   /**
-   * Get cache statistics
+   * Enable continuous background generation
+   */
+  enableContinuousGeneration(userImageBase64: string) {
+    console.log('[LOADING] 🔄 Enabling continuous generation with 100-image buffer');
+    this.userImageBase64 = userImageBase64;
+    this.continuousGenerationEnabled = true;
+    this.scheduleBackgroundGeneration();
+  }
+
+  /**
+   * Start continuous generation system
+   */
+  private startContinuousGeneration() {
+    if (this.backgroundGenerationTimer) {
+      clearInterval(this.backgroundGenerationTimer);
+    }
+
+    this.backgroundGenerationTimer = setInterval(() => {
+      if (this.continuousGenerationEnabled && this.userImageBase64) {
+        this.maintainBuffer();
+      }
+    }, this.CONTINUOUS_CHECK_INTERVAL);
+  }
+
+  /**
+   * Maintain the 100-image buffer continuously
+   */
+  private maintainBuffer() {
+    const currentMaxPosition = Math.max(...Array.from(this.imageCache.keys()), 0);
+    const distanceFromEnd = currentMaxPosition - this.lastScrollPosition;
+
+    // Update max generated position
+    this.maxGeneratedPosition = Math.max(this.maxGeneratedPosition, currentMaxPosition);
+
+    const needsMoreImages = (
+      distanceFromEnd <= this.GENERATION_TRIGGER_DISTANCE || // User approaching end
+      this.imageCache.size < this.BUFFER_TARGET || // Buffer not full
+      this.jobQueue.length === 0 // No jobs queued
+    );
+
+    if (needsMoreImages) {
+      console.log('[LOADING] 🚀 Buffer maintenance triggered:', {
+        distanceFromEnd,
+        bufferSize: this.imageCache.size,
+        queueLength: this.jobQueue.length,
+        userPosition: this.lastScrollPosition
+      });
+
+      this.generateBufferBatch();
+    }
+  }
+
+  /**
+   * Generate a batch of images for the buffer with duplicate prevention
+   */
+  private generateBufferBatch() {
+    if (!this.userImageBase64) return;
+
+    const jobs = [];
+    const startPosition = this.maxGeneratedPosition + 1;
+
+    for (let i = 0; i < this.BATCH_SIZE; i++) {
+      const position = startPosition + i;
+
+      if (!this.imageCache.has(position)) {
+        const uniqueId = `buffer_${position}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const prompt = this.getPromptForPosition(position);
+
+        jobs.push({
+          id: uniqueId,
+          prompt,
+          priority: 'cache' as const,
+          position
+        });
+
+        console.log(`[BUFFER] 📦 Queuing position ${position} with unique ID: ${uniqueId.substring(0, 20)}...`);
+      } else {
+        console.log(`[BUFFER] ⏭️ Skipping position ${position} - already cached`);
+      }
+    }
+
+    if (jobs.length > 0) {
+      console.log('[LOADING] 🚀 Generating buffer batch:', jobs.length, 'unique images from position', startPosition);
+      this.queueJobs(jobs, this.userImageBase64);
+      this.maxGeneratedPosition = startPosition + this.BATCH_SIZE - 1;
+    } else {
+      console.log('[BUFFER] ✅ All positions already cached, no new jobs needed');
+    }
+  }
+
+  /**
+   * Enhanced background generation scheduling
+   */
+  private scheduleBackgroundGeneration() {
+    // Immediate buffer fill
+    this.maintainBuffer();
+
+    // Schedule periodic buffer maintenance
+    setTimeout(() => {
+      if (this.continuousGenerationEnabled) {
+        this.scheduleBackgroundGeneration();
+      }
+    }, this.CONTINUOUS_CHECK_INTERVAL / 2); // More frequent checks
+  }
+
+  /**
+   * Clear all caches and reset service state
+   */
+  clearAllCaches() {
+    console.log('[LOADING] 🧼 Clearing all caches and resetting state');
+
+    // Clear all caches
+    this.imageCache.clear();
+    this.preloadedImages.clear();
+    this.jobQueue.length = 0;
+    this.processing.clear();
+
+    // Reset state
+    this.maxGeneratedPosition = 0;
+    this.lastScrollPosition = 0;
+    this.scrollVelocity = 0;
+    this.scrollDirection = 'down';
+
+    // Reset worker stats (keep workers active)
+    this.workerStats.forEach(stat => {
+      stat.busy = false;
+      stat.processed = 0;
+      stat.errors = 0;
+      stat.avgDuration = 0;
+    });
+
+    console.log('[LOADING] ✨ Cache cleared, ready for fresh generation');
+  }
+
+  /**
+   * Get cache statistics with enhanced buffer info
    */
   getCacheStats() {
     const busyWorkers = Array.from(this.workerStats.values()).filter(w => w.busy).length;
+    const currentMaxPosition = Math.max(...Array.from(this.imageCache.keys()), 0);
+    const distanceFromEnd = currentMaxPosition - this.lastScrollPosition;
 
     return {
       queueLength: this.jobQueue.length,
@@ -360,7 +575,15 @@ export class FeedLoadingService {
       preloaded: this.preloadedImages.size,
       busyWorkers,
       totalWorkers: this.MAX_WORKERS,
-      efficiency: busyWorkers / this.MAX_WORKERS
+      efficiency: busyWorkers / this.MAX_WORKERS,
+      // Enhanced buffer stats
+      bufferHealth: Math.min(100, (this.imageCache.size / this.BUFFER_TARGET) * 100),
+      distanceFromEnd,
+      maxGeneratedPosition: this.maxGeneratedPosition,
+      continuousEnabled: this.continuousGenerationEnabled,
+      // Debug info
+      cacheKeys: Array.from(this.imageCache.keys()),
+      processingIds: Array.from(this.processing.keys())
     };
   }
 }

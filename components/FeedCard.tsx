@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Image,
@@ -8,6 +8,7 @@ import {
   Text,
   Animated,
   PanResponder,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, Share, Bookmark, ShoppingBag } from 'lucide-react-native';
@@ -28,8 +29,15 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
   const [lastTap, setLastTap] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
+
+  // Reset image state when entry changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [entry.id, entry.imageUrl]);
 
   const handleDoubleTap = () => {
     const now = Date.now();
@@ -123,18 +131,40 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
           source={{ uri: entry.imageUrl }}
           style={styles.image}
           resizeMode="cover"
-          onError={() => {
-            console.warn('[FEEDCARD] Image failed to load:', entry.imageUrl);
+          onError={(error) => {
+            console.warn('[FEEDCARD] Image failed to load:', {
+              url: entry.imageUrl,
+              error: error.nativeEvent?.error || 'Unknown error',
+              entryId: entry.id
+            });
             setImageError(true);
+            setImageLoaded(false);
           }}
-          onLoad={() => setImageError(false)}
+          onLoad={() => {
+            console.log('[FEEDCARD] ✅ Image loaded successfully:', entry.id);
+            setImageError(false);
+            setImageLoaded(true);
+          }}
+          onLoadStart={() => {
+            console.log('[FEEDCARD] 🔄 Image loading started:', entry.id);
+            setImageError(false);
+          }}
         />
 
-        {/* Fallback for failed images */}
-        {imageError && (
+        {/* Loading indicator */}
+        {!imageLoaded && !imageError && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#667eea" />
+            <Text style={styles.loadingText}>Loading outfit...</Text>
+          </View>
+        )}
+
+        {/* Fallback for failed images - only show for real failures, not during loading */}
+        {imageError && imageLoaded === false && (
           <View style={styles.imageFallback}>
             <Text style={styles.fallbackText}>Image Error</Text>
             <Text style={styles.fallbackSubtext}>{entry.prompt}</Text>
+            <Text style={styles.fallbackUrl}>URL: {entry.imageUrl.substring(0, 60)}...</Text>
           </View>
         )}
         
@@ -308,5 +338,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 20,
+  },
+  fallbackUrl: {
+    color: '#aaa',
+    fontSize: 10,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    marginTop: 8,
+    fontFamily: 'monospace',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3,
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
   },
 });

@@ -29,10 +29,39 @@ export interface FeedEntry {
 }
 
 // Simple mock data for immediate display
+// Reliable embedded base64 mock images - always load successfully
+const MOCK_IMAGE_1 = 'data:image/svg+xml;base64,' + btoa(`
+<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#grad1)"/>
+  <text x="200" y="280" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">Casual Outfit</text>
+  <text x="200" y="320" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" opacity="0.8">Loading AI...</text>
+</svg>
+`);
+
+const MOCK_IMAGE_2 = 'data:image/svg+xml;base64,' + btoa(`
+<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ecdc4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#44a08d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#grad2)"/>
+  <text x="200" y="280" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">Business Outfit</text>
+  <text x="200" y="320" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" opacity="0.8">Loading AI...</text>
+</svg>
+`);
+
 const INITIAL_FEED: FeedEntry[] = [
   {
     id: 'mock-1',
-    imageUrl: 'https://via.placeholder.com/400x600/667eea/ffffff?text=Casual+Outfit',
+    imageUrl: MOCK_IMAGE_1,
     prompt: 'Casual everyday outfit',
     outfitId: 'mock-outfit-1',
     items: [
@@ -49,7 +78,7 @@ const INITIAL_FEED: FeedEntry[] = [
   },
   {
     id: 'mock-2',
-    imageUrl: 'https://via.placeholder.com/400x600/4ecdc4/ffffff?text=Business+Outfit',
+    imageUrl: MOCK_IMAGE_2,
     prompt: 'Business casual outfit',
     outfitId: 'mock-outfit-2',
     items: [
@@ -84,7 +113,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const lastScrollTime = useRef<number>(Date.now());
   const lastScrollIndex = useRef<number>(0);
 
-  // Update feed with cached images - only add NEW images, never replace existing ones
+  // Enhanced feed update with infinite scroll support
   const updateFeedFromCache = useCallback(() => {
     setFeed(currentFeed => {
       const stats = loadingService.getCacheStats();
@@ -94,12 +123,40 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       const updatedFeed = [...currentFeed];
       let hasNewImages = false;
 
+      // Get actual cached positions to avoid duplicates
+      const cacheStats = loadingService.getCacheStats();
+      const actualCachedPositions = [];
+      for (let pos = 2; pos < 200; pos++) { // Scan more positions
+        if (loadingService.getImage(pos)) {
+          actualCachedPositions.push(pos);
+        }
+      }
+
+      const maxAvailablePosition = actualCachedPositions.length > 0 ? Math.max(...actualCachedPositions) : 2;
+      const scanLimit = Math.max(100, maxAvailablePosition + 30); // Larger scan range for infinite scroll
+
+      console.log('[FEED] 🔍 Cache scan:', {
+        cachedPositions: actualCachedPositions.length,
+        maxPosition: maxAvailablePosition,
+        scanLimit,
+        statsReported: cacheStats.cached
+      });
+
       // Only add new cached images to empty positions
-      for (let i = 2; i < 50; i++) { // Start after initial mock images
+      for (let i = 2; i < scanLimit; i++) { // Start after initial mock images
         const cachedImage = loadingService.getImage(i);
 
-        // Only add if we don't already have an image at this position
+        // Only add if we don't already have an image at this position AND it's a valid cached image
         if (cachedImage && (i >= updatedFeed.length || !updatedFeed[i])) {
+          // Validate the cached image is unique
+          const isDuplicate = updatedFeed.some(entry =>
+            entry && entry.imageUrl === cachedImage.imageUrl
+          );
+
+          if (isDuplicate) {
+            console.warn('[FEED] ⚠️ Skipping duplicate image at position', i, 'ID:', cachedImage.id.substring(0, 12));
+            continue;
+          }
           const feedEntry: FeedEntry = {
             id: cachedImage.id,
             imageUrl: cachedImage.imageUrl,
@@ -129,7 +186,27 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
 
       // Only return new array if we actually added images (prevents unnecessary re-renders)
       if (hasNewImages) {
-        return updatedFeed.filter(Boolean);
+        const filteredFeed = updatedFeed.filter(Boolean);
+
+        // Validate no duplicate images in feed
+        const imageUrls = new Set();
+        let duplicateCount = 0;
+        filteredFeed.forEach((entry, index) => {
+          if (entry && imageUrls.has(entry.imageUrl)) {
+            duplicateCount++;
+            console.warn(`[FEED] 😱 Duplicate detected at index ${index}:`, entry.id?.substring(0, 12));
+          }
+          if (entry) imageUrls.add(entry.imageUrl);
+        });
+
+        console.log('[FEED] 📦 Feed updated:', {
+          totalImages: filteredFeed.length,
+          uniqueImages: imageUrls.size,
+          duplicatesRemoved: duplicateCount,
+          bufferHealth: stats.bufferHealth?.toFixed(1) + '%',
+          newImagesAdded: hasNewImages
+        });
+        return filteredFeed;
       }
       return currentFeed;
     });
@@ -158,77 +235,96 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     setTimeout(updateFeedFromCache, 100);
   }, [loadingService, updateFeedFromCache]);
 
-  // Initialize with intelligent preloading
+  // Initialize with intelligent preloading and continuous generation
   const initializeIntelligentFeed = useCallback((userImageBase64: string) => {
     if (hasInitialized) return;
 
-    console.log('[FEED] 🚀 Initializing intelligent loading with 10 parallel workers');
+    console.log('[FEED] 🚀 Initializing intelligent loading with 10 parallel workers + continuous generation');
     setHasInitialized(true);
 
-    // Create initial jobs with priority system
+    // Enable continuous generation for 100-image buffer
+    loadingService.enableContinuousGeneration(userImageBase64);
+
+    const timestamp = Date.now();
+    const sessionId = Math.random().toString(36).substring(2, 9);
+
+    // Create initial jobs with unique IDs and varied prompts
     const initialJobs = [
       // Critical - immediately visible
-      { id: 'init_0', prompt: 'casual summer outfit', priority: 'critical' as const, position: 2 },
-      { id: 'init_1', prompt: 'business professional attire', priority: 'critical' as const, position: 3 },
-      { id: 'init_2', prompt: 'trendy streetwear look', priority: 'critical' as const, position: 4 },
+      { id: `init_${timestamp}_${sessionId}_0`, prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2 },
+      { id: `init_${timestamp}_${sessionId}_1`, prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3 },
+      { id: `init_${timestamp}_${sessionId}_2`, prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4 },
 
       // High priority preload
-      { id: 'init_3', prompt: 'elegant evening wear', priority: 'preload' as const, position: 5 },
-      { id: 'init_4', prompt: 'cozy weekend outfit', priority: 'preload' as const, position: 6 },
-      { id: 'init_5', prompt: 'vintage inspired outfit', priority: 'preload' as const, position: 7 },
-      { id: 'init_6', prompt: 'athletic wear ensemble', priority: 'preload' as const, position: 8 },
-      { id: 'init_7', prompt: 'minimalist chic style', priority: 'preload' as const, position: 9 },
+      { id: `init_${timestamp}_${sessionId}_3`, prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5 },
+      { id: `init_${timestamp}_${sessionId}_4`, prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6 },
+      { id: `init_${timestamp}_${sessionId}_5`, prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7 },
+      { id: `init_${timestamp}_${sessionId}_6`, prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8 },
+      { id: `init_${timestamp}_${sessionId}_7`, prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9 },
 
       // Background cache
-      { id: 'init_8', prompt: 'bohemian fashion look', priority: 'cache' as const, position: 10 },
-      { id: 'init_9', prompt: 'smart casual attire', priority: 'cache' as const, position: 11 },
-      { id: 'init_10', prompt: 'formal dinner outfit', priority: 'cache' as const, position: 12 },
-      { id: 'init_11', prompt: 'beach vacation style', priority: 'cache' as const, position: 13 },
-      { id: 'init_12', prompt: 'urban explorer look', priority: 'cache' as const, position: 14 },
-      { id: 'init_13', prompt: 'romantic date night', priority: 'cache' as const, position: 15 },
-      { id: 'init_14', prompt: 'creative artist vibe', priority: 'cache' as const, position: 16 },
+      { id: `init_${timestamp}_${sessionId}_8`, prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10 },
+      { id: `init_${timestamp}_${sessionId}_9`, prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11 },
+      { id: `init_${timestamp}_${sessionId}_10`, prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12 },
+      { id: `init_${timestamp}_${sessionId}_11`, prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13 },
+      { id: `init_${timestamp}_${sessionId}_12`, prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14 },
+      { id: `init_${timestamp}_${sessionId}_13`, prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15 },
+      { id: `init_${timestamp}_${sessionId}_14`, prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16 },
     ];
+
+    console.log('[FEED] 🎯 Generated', initialJobs.length, 'unique initialization jobs with session ID:', sessionId);
 
     // Queue all jobs for parallel processing
     loadingService.queueJobs(initialJobs, userImageBase64);
 
-    // Set up continuous cache updating
+    // Set up enhanced continuous cache updating for infinite scroll
     const updateInterval = setInterval(() => {
       updateFeedFromCache();
-    }, 1000);
+    }, 2000); // Longer interval since we have continuous generation
 
-    // Cleanup interval after initialization
-    setTimeout(() => clearInterval(updateInterval), 30000);
+    // Don't clean up interval - keep running for infinite scroll
+    // The continuous generation system will handle buffer maintenance
   }, [hasInitialized, loadingService, updateFeedFromCache]);
 
-  // Smart preloading based on scroll patterns
+  // Enhanced smart preloading with continuous generation
   const triggerSmartPreload = useCallback((userImageBase64: string) => {
     if (!hasInitialized) return;
 
-    // Generate jobs for positions that aren't cached yet
-    const jobs = [];
     const currentStats = loadingService.getCacheStats();
 
-    // Adaptive preloading based on scroll velocity
-    const velocityMultiplier = Math.min(Math.abs(scrollVelocity) * 2, 10);
-    const preloadDistance = 20 + velocityMultiplier;
+    console.log('[FEED] 🧠 Smart preload triggered:', {
+      scrollVelocity: scrollVelocity.toFixed(2),
+      bufferHealth: currentStats.bufferHealth?.toFixed(1) + '%',
+      distanceFromEnd: currentStats.distanceFromEnd,
+      cached: currentStats.cached
+    });
 
-    for (let i = currentIndex + 5; i < currentIndex + preloadDistance; i++) {
+    // Generate unique critical jobs for immediate positions
+    const jobs = [];
+    const timestamp = Date.now();
+    const batchId = Math.random().toString(36).substring(2, 9);
+
+    for (let i = currentIndex + 1; i <= currentIndex + 5; i++) {
       if (!loadingService.getImage(i)) {
+        const uniqueId = `critical_${timestamp}_${batchId}_${i}`;
         jobs.push({
-          id: `smart_${i}`,
+          id: uniqueId,
           prompt: getSmartPrompt(i),
-          priority: i < currentIndex + 10 ? 'preload' as const : 'cache' as const,
+          priority: 'critical' as const,
           position: i
         });
+        console.log(`[FEED] ⚡ Queuing critical position ${i} with ID: ${uniqueId.substring(0, 25)}...`);
       }
     }
 
     if (jobs.length > 0) {
-      console.log('[FEED] 🧠 Smart preloading', jobs.length, 'images based on scroll velocity:', scrollVelocity.toFixed(2));
+      console.log('[FEED] ⚡ Queueing', jobs.length, 'critical positions for immediate processing');
       loadingService.queueJobs(jobs, userImageBase64);
     }
-  }, [hasInitialized, loadingService, currentIndex, scrollVelocity]);
+
+    // Trigger buffer maintenance
+    setTimeout(updateFeedFromCache, 500);
+  }, [hasInitialized, loadingService, currentIndex, scrollVelocity, updateFeedFromCache]);
 
   // Get smart prompt based on position and user patterns
   const getSmartPrompt = useCallback((position: number): string => {
@@ -307,9 +403,24 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       isError: false,
       error: null,
     },
-    // Advanced features
+    // Advanced features with continuous generation
     loadingStats,
     scrollVelocity,
     workerStats: loadingService.getWorkerStats(),
+
+    // Continuous generation status
+    bufferHealth: loadingStats?.bufferHealth || 0,
+    distanceFromEnd: loadingStats?.distanceFromEnd || 0,
+    continuousEnabled: loadingStats?.continuousEnabled || false,
+
+    // Debug and reset functions
+    resetLoadingService: () => {
+      console.log('[FEED] 🔄 Resetting loading service and clearing all caches');
+      loadingService.clearAllCaches();
+      setFeed(INITIAL_FEED); // Reset to initial mock data
+      setCurrentIndex(0);
+      setHasInitialized(false);
+      console.log('[FEED] ✨ Ready for fresh start');
+    },
   };
 });

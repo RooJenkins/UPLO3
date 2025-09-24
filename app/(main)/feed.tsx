@@ -36,6 +36,12 @@ export default function FeedScreen() {
     loadingStats,
     scrollVelocity,
     workerStats,
+    // Continuous generation properties
+    bufferHealth,
+    distanceFromEnd,
+    continuousEnabled,
+    // Debug functions
+    resetLoadingService,
   } = useFeed();
   const { userImage, clearUserData } = useUser();
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -89,12 +95,24 @@ export default function FeedScreen() {
     index,
   });
 
-  // Add loading cards to the feed for smooth UX - filter out any undefined entries
+  // Enhanced feed display with infinite scroll support
   const displayFeed: (FeedEntry | { id: string; isGenerating: true })[] = [...feed.filter(Boolean)];
-  if (displayFeed.length < 8) { // Increased for better preloading
-    for (let i = displayFeed.length; i < 8; i++) {
+
+  // Dynamically add loading cards based on buffer health and user position
+  const bufferHealthNumber = bufferHealth || 0;
+  const shouldShowMoreLoading = bufferHealthNumber < 90 || (distanceFromEnd && distanceFromEnd < 30);
+  const loadingCardsCount = shouldShowMoreLoading ? 20 : 8; // More loading cards when buffer is low
+
+  if (displayFeed.length < loadingCardsCount) {
+    for (let i = displayFeed.length; i < loadingCardsCount; i++) {
       displayFeed.push({ id: `loading_${i}`, isGenerating: true });
     }
+  }
+
+  // Add extra padding for infinite scroll
+  const totalItemsToShow = Math.max(displayFeed.length, currentIndex + 25);
+  while (displayFeed.length < totalItemsToShow) {
+    displayFeed.push({ id: `infinite_${displayFeed.length}`, isGenerating: true });
   }
 
   // Cloud sync status indicator
@@ -110,7 +128,12 @@ export default function FeedScreen() {
           </Link>
           <View
             style={[styles.debugPill, { backgroundColor: 'rgba(255, 0, 0, 0.8)' }]}
-            onTouchEnd={clearUserData}
+            onTouchEnd={() => {
+              console.log('[FEED] 🔄 Full system reset initiated');
+              resetLoadingService(); // Clear loading service first
+              clearUserData(); // Then clear user data
+              console.log('[FEED] ✨ Full reset complete');
+            }}
           >
             <Text style={styles.debugText}>Reset</Text>
           </View>

@@ -49,14 +49,27 @@ export function LoadingStats({ stats, scrollVelocity, style }: LoadingStatsProps
         </Text>
       </View>
 
-      {/* Scroll Velocity */}
-      <View style={styles.statRow}>
-        <Gauge size={14} color={velocityColor} />
-        <Text style={styles.statLabel}>Speed</Text>
-        <Text style={[styles.statValue, { color: velocityColor }]}>
-          {Math.abs(scrollVelocity).toFixed(1)}
-        </Text>
-      </View>
+      {/* Buffer Health */}
+      {stats.bufferHealth !== undefined && (
+        <View style={styles.statRow}>
+          <Target size={14} color={bufferHealthColor} />
+          <Text style={styles.statLabel}>Buffer</Text>
+          <Text style={[styles.statValue, { color: bufferHealthColor }]}>
+            {stats.bufferHealth.toFixed(0)}%
+          </Text>
+        </View>
+      )}
+
+      {/* Distance from End */}
+      {stats.distanceFromEnd !== undefined && (
+        <View style={styles.statRow}>
+          <Gauge size={14} color={distanceColor} />
+          <Text style={styles.statLabel}>Distance</Text>
+          <Text style={[styles.statValue, { color: distanceColor }]}>
+            {stats.distanceFromEnd}
+          </Text>
+        </View>
+      )}
 
       {/* Queue Length */}
       {stats.queueLength > 0 && (
@@ -64,6 +77,18 @@ export function LoadingStats({ stats, scrollVelocity, style }: LoadingStatsProps
           <Text style={styles.queueIndicator}>
             Q:{stats.queueLength}
           </Text>
+        </View>
+      )}
+
+      {/* Continuous Generation Status */}
+      {stats.continuousEnabled && (
+        <View style={styles.statRow}>
+          <RotateCw
+            size={12}
+            color="#4ECDC4"
+            style={stats.processing > 0 ? styles.spinning : {}}
+          />
+          <Text style={[styles.statLabel, { color: '#4ECDC4' }]}>Continuous</Text>
         </View>
       )}
 
@@ -113,5 +138,10 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  spinning: {
+    // Note: React Native doesn't support CSS animations,
+    // but the rotation effect suggests activity
+    opacity: 0.8,
   },
 });
