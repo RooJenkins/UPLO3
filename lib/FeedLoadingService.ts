@@ -60,7 +60,7 @@ export class FeedLoadingService {
   private userImageBase64: string | null = null;
 
   constructor() {
-    console.log('[LOADING] 🚀 Initializing FeedLoadingService with 30 parallel workers');
+    console.log('[LOADING] 🚀 FRESH FeedLoadingService initialization with', this.MAX_WORKERS, 'parallel workers');
     this.initializeWorkers();
     this.startContinuousGeneration();
   }
@@ -344,12 +344,30 @@ export class FeedLoadingService {
       'sporty casual', 'elegant cocktail', 'boho chic', 'minimalist modern',
       'romantic feminine', 'edgy contemporary', 'professional casual',
       'vacation resort', 'city night out', 'weekend relaxed',
-      'formal business', 'trendy fashion forward', 'comfortable stylish'
+      'formal business', 'trendy fashion forward', 'comfortable stylish',
+      // Additional styles for more variation
+      'grunge aesthetic', 'cottagecore charm', 'dark academia', 'soft girl style',
+      'academia chic', 'tomboy casual', 'ethereal fairy', 'cyberpunk futuristic',
+      'prairie dress vintage', 'mod 60s style', 'disco 70s glam', '80s power suit',
+      '90s grunge revival', 'y2k nostalgic', 'indie sleaze', 'clean girl minimal',
+      'maximalist bold', 'scandinavian simple', 'french girl chic', 'italian luxury'
     ];
 
-    const colors = ['black', 'white', 'navy', 'red', 'pink', 'green', 'blue', 'purple', 'yellow', 'orange', 'gray', 'brown', 'beige'];
-    const modifiers = ['modern', 'vintage', 'stylish', 'comfortable', 'elegant', 'casual', 'edgy', 'feminine', 'minimalist', 'bold'];
-    const accessories = ['with belt', 'with hat', 'with jacket', 'with scarf', 'with jewelry', 'with sunglasses', 'with bag', ''];
+    const colors = [
+      'black', 'white', 'navy', 'red', 'pink', 'green', 'blue', 'purple', 'yellow', 'orange', 'gray', 'brown', 'beige',
+      'cream', 'ivory', 'charcoal', 'burgundy', 'emerald', 'sapphire', 'coral', 'mint', 'lavender', 'peach', 'sage',
+      'terracotta', 'mustard', 'forest', 'plum', 'rose', 'taupe', 'khaki', 'camel', 'rust', 'teal', 'mauve'
+    ];
+    const modifiers = [
+      'modern', 'vintage', 'stylish', 'comfortable', 'elegant', 'casual', 'edgy', 'feminine', 'minimalist', 'bold',
+      'sophisticated', 'playful', 'dramatic', 'understated', 'striking', 'refined', 'relaxed', 'polished', 'trendy', 'timeless',
+      'chic', 'effortless', 'sleek', 'cozy', 'glamorous', 'artistic', 'classic', 'contemporary', 'romantic', 'powerful'
+    ];
+    const accessories = [
+      'with belt', 'with hat', 'with jacket', 'with scarf', 'with jewelry', 'with sunglasses', 'with bag', 'with boots',
+      'with heels', 'with sneakers', 'with watch', 'with earrings', 'with necklace', 'with bracelet', 'with ring',
+      'with cardigan', 'with blazer', 'with vest', 'with shawl', 'with gloves', 'with headband', 'with brooch', ''
+    ];
 
     // Create highly unique combinations using position for deterministic but varied results
     const baseIndex = position % baseStyles.length;
@@ -368,21 +386,37 @@ export class FeedLoadingService {
       prompt += ` ${accessory}`;
     }
 
-    // Add position-based uniqueness for extra variety
+    // Add position-based uniqueness for maximum variety
     const uniqueElements = [
-      'with unique styling',
-      'trendy fashion',
-      'designer look',
-      'street style',
-      'fashion forward',
-      'contemporary design',
-      'modern aesthetic',
-      'stylish appearance'
+      'with unique styling', 'trendy fashion', 'designer look', 'street style', 'fashion forward',
+      'contemporary design', 'modern aesthetic', 'stylish appearance', 'runway inspired', 'haute couture',
+      'ready-to-wear', 'sustainable fashion', 'ethical clothing', 'artisan crafted', 'handmade details',
+      'custom tailored', 'bespoke design', 'limited edition', 'signature style', 'iconic look'
     ];
 
-    prompt += `, ${uniqueElements[position % uniqueElements.length]}`;
+    const textureElements = [
+      'silky smooth', 'textured fabric', 'soft material', 'structured design', 'flowing fabric',
+      'crisp cotton', 'luxe material', 'comfortable fit', 'breathable fabric', 'premium quality',
+      'organic cotton', 'sustainable fabric', 'recycled material', 'natural fiber', 'high-tech fabric'
+    ];
 
-    console.log(`[PROMPT] Position ${position}: "${prompt}"`);
+    const seasonalElements = [
+      'perfect for the season', 'weather-appropriate', 'climate-conscious', 'seasonal transition',
+      'all-season versatile', 'layering piece', 'temperature-perfect', 'season-appropriate'
+    ];
+
+    // Layer multiple uniqueness elements
+    const unique1 = uniqueElements[position % uniqueElements.length];
+    const texture = textureElements[Math.floor(position / uniqueElements.length) % textureElements.length];
+    const seasonal = seasonalElements[Math.floor(position / (uniqueElements.length * textureElements.length)) % seasonalElements.length];
+
+    prompt += `, ${unique1}, ${texture}, ${seasonal}`;
+
+    // Add position hash for ultimate uniqueness
+    const positionHash = (position * 37 + 13) % 1000;
+    prompt += `, style variation ${positionHash}`;
+
+    console.log(`[PROMPT] Position ${position}: "${prompt.substring(0, 100)}..."`);
     return prompt;
   }
 

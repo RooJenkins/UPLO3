@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Cpu, Zap, Database, Gauge } from 'lucide-react-native';
+import { Cpu, Zap, Database, Gauge, Target, RotateCw } from 'lucide-react-native';
 
 interface LoadingStatsProps {
   stats: {
@@ -11,6 +11,9 @@ interface LoadingStatsProps {
     busyWorkers: number;
     totalWorkers: number;
     efficiency: number;
+    bufferHealth?: number;
+    distanceFromEnd?: number;
+    continuousEnabled?: boolean;
   };
   scrollVelocity: number;
   style?: any;
@@ -19,6 +22,8 @@ interface LoadingStatsProps {
 export function LoadingStats({ stats, scrollVelocity, style }: LoadingStatsProps) {
   const efficiencyColor = stats.efficiency > 0.8 ? '#4ECDC4' : stats.efficiency > 0.5 ? '#FFB347' : '#FF6B6B';
   const velocityColor = Math.abs(scrollVelocity) > 2 ? '#4ECDC4' : '#9CA3AF';
+  const bufferHealthColor = (stats.bufferHealth || 0) > 80 ? '#4ECDC4' : (stats.bufferHealth || 0) > 50 ? '#FFB347' : '#FF6B6B';
+  const distanceColor = (stats.distanceFromEnd || 0) < 10 ? '#FF6B6B' : (stats.distanceFromEnd || 0) < 30 ? '#FFB347' : '#4ECDC4';
 
   return (
     <View style={[styles.container, style]}>

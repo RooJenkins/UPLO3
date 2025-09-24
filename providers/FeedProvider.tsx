@@ -29,40 +29,20 @@ export interface FeedEntry {
 }
 
 // Simple mock data for immediate display
-// Reliable embedded base64 mock images - always load successfully
-const MOCK_IMAGE_1 = 'data:image/svg+xml;base64,' + btoa(`
-<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="400" height="600" fill="url(#grad1)"/>
-  <text x="200" y="280" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">Casual Outfit</text>
-  <text x="200" y="320" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" opacity="0.8">Loading AI...</text>
-</svg>
-`);
+// Ultra-reliable mock images using established image hosting
+// Using placeholder services that guarantee availability
+const MOCK_IMAGE_1 = 'https://picsum.photos/400/600?random=casual&blur=1';
+const MOCK_IMAGE_2 = 'https://picsum.photos/400/600?random=business&blur=2';
 
-const MOCK_IMAGE_2 = 'data:image/svg+xml;base64,' + btoa(`
-<svg width="400" height="600" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4ecdc4;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#44a08d;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="400" height="600" fill="url(#grad2)"/>
-  <text x="200" y="280" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">Business Outfit</text>
-  <text x="200" y="320" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" opacity="0.8">Loading AI...</text>
-</svg>
-`);
+// Fallback to simple data URIs if external fails
+const FALLBACK_IMAGE_1 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%23667eea%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%3ECasual%3C/text%3E%3C/svg%3E';
+const FALLBACK_IMAGE_2 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%234ecdc4%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%3EBusiness%3C/text%3E%3C/svg%3E';
 
 const INITIAL_FEED: FeedEntry[] = [
   {
-    id: 'mock-1',
+    id: 'mock-1-ultra-reliable',
     imageUrl: MOCK_IMAGE_1,
-    prompt: 'Casual everyday outfit',
+    prompt: 'Casual everyday outfit - placeholder',
     outfitId: 'mock-outfit-1',
     items: [
       { id: '1', name: 'White T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
@@ -75,11 +55,13 @@ const INITIAL_FEED: FeedEntry[] = [
       colors: ['white', 'blue'],
     },
     timestamp: Date.now() - 1000,
+    // Add fallback URL for extra reliability
+    fallbackImageUrl: FALLBACK_IMAGE_1,
   },
   {
-    id: 'mock-2',
+    id: 'mock-2-ultra-reliable',
     imageUrl: MOCK_IMAGE_2,
-    prompt: 'Business casual outfit',
+    prompt: 'Business casual outfit - placeholder',
     outfitId: 'mock-outfit-2',
     items: [
       { id: '3', name: 'Blazer', brand: 'Zara', price: '$129.00', category: 'outerwear' },
@@ -92,12 +74,23 @@ const INITIAL_FEED: FeedEntry[] = [
       colors: ['navy', 'white'],
     },
     timestamp: Date.now() - 2000,
+    // Add fallback URL for extra reliability
+    fallbackImageUrl: FALLBACK_IMAGE_2,
   },
 ];
 
+console.log('[FEED] 🎯 Initial mock feed created with ultra-reliable image URLs');
+console.log('[FEED] Mock 1 URL:', MOCK_IMAGE_1.substring(0, 50) + '...');
+console.log('[FEED] Mock 2 URL:', MOCK_IMAGE_2.substring(0, 50) + '...');
+
 export const [FeedProvider, useFeed] = createContextHook(() => {
-  // Advanced loading service
-  const loadingService = useRef<FeedLoadingService>(new FeedLoadingService()).current;
+  // Advanced loading service - force recreation for 30 workers
+  const loadingService = useRef<FeedLoadingService | null>(null);
+  if (!loadingService.current) {
+    console.log('[FEED] 🆕 Creating FRESH FeedLoadingService instance');
+    loadingService.current = new FeedLoadingService();
+  }
+  const service = loadingService.current;
 
   // Get user image from UserProvider
   const { userImage } = useUser();
@@ -116,7 +109,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   // Enhanced feed update with infinite scroll support
   const updateFeedFromCache = useCallback(() => {
     setFeed(currentFeed => {
-      const stats = loadingService.getCacheStats();
+      const stats = service.getCacheStats();
       setLoadingStats(stats);
 
       // Start with existing feed - NEVER replace existing entries
@@ -124,10 +117,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       let hasNewImages = false;
 
       // Get actual cached positions to avoid duplicates
-      const cacheStats = loadingService.getCacheStats();
+      const cacheStats = service.getCacheStats();
       const actualCachedPositions = [];
       for (let pos = 2; pos < 200; pos++) { // Scan more positions
-        if (loadingService.getImage(pos)) {
+        if (service.getImage(pos)) {
           actualCachedPositions.push(pos);
         }
       }
@@ -144,7 +137,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
 
       // Only add new cached images to empty positions
       for (let i = 2; i < scanLimit; i++) { // Start after initial mock images
-        const cachedImage = loadingService.getImage(i);
+        const cachedImage = service.getImage(i);
 
         // Only add if we don't already have an image at this position AND it's a valid cached image
         if (cachedImage && (i >= updatedFeed.length || !updatedFeed[i])) {
@@ -210,7 +203,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       }
       return currentFeed;
     });
-  }, [loadingService]);
+  }, [service]);
 
   // Enhanced scroll tracking with velocity calculation
   const updateScrollPosition = useCallback((newIndex: number) => {
@@ -223,7 +216,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     setScrollVelocity(velocity);
 
     // Update loading service with scroll data
-    loadingService.updateScrollPosition(newIndex, velocity);
+    service.updateScrollPosition(newIndex, velocity);
 
     // Update tracking refs
     lastScrollTime.current = now;
@@ -233,7 +226,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
 
     // Update feed from cache
     setTimeout(updateFeedFromCache, 100);
-  }, [loadingService, updateFeedFromCache]);
+  }, [service, updateFeedFromCache]);
 
   // Initialize with intelligent preloading and continuous generation
   const initializeIntelligentFeed = useCallback((userImageBase64: string) => {
@@ -243,39 +236,49 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     setHasInitialized(true);
 
     // Enable continuous generation for 100-image buffer
-    loadingService.enableContinuousGeneration(userImageBase64);
+    service.enableContinuousGeneration(userImageBase64);
 
-    const timestamp = Date.now();
-    const sessionId = Math.random().toString(36).substring(2, 9);
+    // Generate ultra-unique identifiers to prevent React key collisions
+    const initTimestamp = Date.now();
+    const sessionId = Math.random().toString(36).substring(2, 15); // Longer for more uniqueness
+    const processId = Math.floor(Math.random() * 100000);
 
-    // Create initial jobs with unique IDs and varied prompts
+    // Helper function to generate guaranteed unique IDs
+    const generateUniqueId = (index: number) => {
+      const microTime = Date.now() + index; // Offset each by index
+      const random = Math.random().toString(36).substring(2, 10);
+      return `init_${initTimestamp}_${sessionId}_${processId}_${microTime}_${random}_${index}`;
+    };
+
+    // Create initial jobs with guaranteed unique IDs and varied prompts
     const initialJobs = [
       // Critical - immediately visible
-      { id: `init_${timestamp}_${sessionId}_0`, prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2 },
-      { id: `init_${timestamp}_${sessionId}_1`, prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3 },
-      { id: `init_${timestamp}_${sessionId}_2`, prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4 },
+      { id: generateUniqueId(0), prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2 },
+      { id: generateUniqueId(1), prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3 },
+      { id: generateUniqueId(2), prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4 },
 
       // High priority preload
-      { id: `init_${timestamp}_${sessionId}_3`, prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5 },
-      { id: `init_${timestamp}_${sessionId}_4`, prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6 },
-      { id: `init_${timestamp}_${sessionId}_5`, prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7 },
-      { id: `init_${timestamp}_${sessionId}_6`, prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8 },
-      { id: `init_${timestamp}_${sessionId}_7`, prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9 },
+      { id: generateUniqueId(3), prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5 },
+      { id: generateUniqueId(4), prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6 },
+      { id: generateUniqueId(5), prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7 },
+      { id: generateUniqueId(6), prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8 },
+      { id: generateUniqueId(7), prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9 },
 
       // Background cache
-      { id: `init_${timestamp}_${sessionId}_8`, prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10 },
-      { id: `init_${timestamp}_${sessionId}_9`, prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11 },
-      { id: `init_${timestamp}_${sessionId}_10`, prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12 },
-      { id: `init_${timestamp}_${sessionId}_11`, prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13 },
-      { id: `init_${timestamp}_${sessionId}_12`, prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14 },
-      { id: `init_${timestamp}_${sessionId}_13`, prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15 },
-      { id: `init_${timestamp}_${sessionId}_14`, prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16 },
+      { id: generateUniqueId(8), prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10 },
+      { id: generateUniqueId(9), prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11 },
+      { id: generateUniqueId(10), prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12 },
+      { id: generateUniqueId(11), prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13 },
+      { id: generateUniqueId(12), prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14 },
+      { id: generateUniqueId(13), prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15 },
+      { id: generateUniqueId(14), prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16 },
     ];
 
-    console.log('[FEED] 🎯 Generated', initialJobs.length, 'unique initialization jobs with session ID:', sessionId);
+    console.log('[FEED] 🎯 Generated', initialJobs.length, 'ULTRA-UNIQUE initialization jobs. Session:', sessionId.substring(0,8));
+    console.log('[FEED] 🔑 First job ID sample:', initialJobs[0].id.substring(0, 40) + '...');
 
     // Queue all jobs for parallel processing
-    loadingService.queueJobs(initialJobs, userImageBase64);
+    service.queueJobs(initialJobs, userImageBase64);
 
     // Set up enhanced continuous cache updating for infinite scroll
     const updateInterval = setInterval(() => {
@@ -284,13 +287,13 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
 
     // Don't clean up interval - keep running for infinite scroll
     // The continuous generation system will handle buffer maintenance
-  }, [hasInitialized, loadingService, updateFeedFromCache]);
+  }, [hasInitialized, service, updateFeedFromCache]);
 
   // Enhanced smart preloading with continuous generation
   const triggerSmartPreload = useCallback((userImageBase64: string) => {
     if (!hasInitialized) return;
 
-    const currentStats = loadingService.getCacheStats();
+    const currentStats = service.getCacheStats();
 
     console.log('[FEED] 🧠 Smart preload triggered:', {
       scrollVelocity: scrollVelocity.toFixed(2),
@@ -299,32 +302,36 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       cached: currentStats.cached
     });
 
-    // Generate unique critical jobs for immediate positions
+    // Generate ultra-unique critical jobs for immediate positions
     const jobs = [];
-    const timestamp = Date.now();
-    const batchId = Math.random().toString(36).substring(2, 9);
+    const criticalTimestamp = Date.now();
+    const batchId = Math.random().toString(36).substring(2, 15);
+    const criticalProcessId = Math.floor(Math.random() * 100000);
 
     for (let i = currentIndex + 1; i <= currentIndex + 5; i++) {
-      if (!loadingService.getImage(i)) {
-        const uniqueId = `critical_${timestamp}_${batchId}_${i}`;
+      if (!service.getImage(i)) {
+        const microTime = Date.now() + i;
+        const randomSuffix = Math.random().toString(36).substring(2, 10);
+        const uniqueId = `critical_${criticalTimestamp}_${batchId}_${criticalProcessId}_${microTime}_${randomSuffix}_${i}`;
+
         jobs.push({
           id: uniqueId,
           prompt: getSmartPrompt(i),
           priority: 'critical' as const,
           position: i
         });
-        console.log(`[FEED] ⚡ Queuing critical position ${i} with ID: ${uniqueId.substring(0, 25)}...`);
+        console.log(`[FEED] ⚡ Queuing critical position ${i} with ULTRA-UNIQUE ID: ${uniqueId.substring(0, 35)}...`);
       }
     }
 
     if (jobs.length > 0) {
       console.log('[FEED] ⚡ Queueing', jobs.length, 'critical positions for immediate processing');
-      loadingService.queueJobs(jobs, userImageBase64);
+      service.queueJobs(jobs, userImageBase64);
     }
 
     // Trigger buffer maintenance
     setTimeout(updateFeedFromCache, 500);
-  }, [hasInitialized, loadingService, currentIndex, scrollVelocity, updateFeedFromCache]);
+  }, [hasInitialized, service, currentIndex, scrollVelocity, updateFeedFromCache]);
 
   // Get smart prompt based on position and user patterns
   const getSmartPrompt = useCallback((position: number): string => {
@@ -374,7 +381,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   // Performance monitoring
   useEffect(() => {
     const monitoringInterval = setInterval(() => {
-      const stats = loadingService.getCacheStats();
+      const stats = service.getCacheStats();
       setLoadingStats(stats);
 
       if (stats.efficiency > 0.8) {
@@ -383,7 +390,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }, 2000);
 
     return () => clearInterval(monitoringInterval);
-  }, [loadingService]);
+  }, [service]);
 
   return {
     feed,
@@ -406,7 +413,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     // Advanced features with continuous generation
     loadingStats,
     scrollVelocity,
-    workerStats: loadingService.getWorkerStats(),
+    workerStats: service.getWorkerStats(),
 
     // Continuous generation status
     bufferHealth: loadingStats?.bufferHealth || 0,
@@ -416,7 +423,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     // Debug and reset functions
     resetLoadingService: () => {
       console.log('[FEED] 🔄 Resetting loading service and clearing all caches');
-      loadingService.clearAllCaches();
+      service.clearAllCaches();
       setFeed(INITIAL_FEED); // Reset to initial mock data
       setCurrentIndex(0);
       setHasInitialized(false);
