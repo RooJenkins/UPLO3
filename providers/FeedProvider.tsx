@@ -227,6 +227,33 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     return prompts[position % prompts.length];
   }, []);
 
+  // Initialize loading when user image becomes available
+  useEffect(() => {
+    console.log('[FEED] 🔍 useEffect triggered:', {
+      hasUserImage: !!userImage,
+      hasBase64: !!userImage?.base64,
+      feedLength: feed.length,
+      userImageId: userImage?.id,
+      hasInitialized
+    });
+
+    if (userImage?.base64) {
+      console.log('[FEED] ✅ UserImage with base64 available, initializing feed...');
+      if (!hasInitialized) {
+        console.log('[FEED] 🚀 Starting initial feed generation');
+        initializeIntelligentFeed(userImage.base64);
+      } else {
+        console.log('[FEED] 🔄 Processing queue for existing feed');
+        triggerSmartPreload(userImage.base64);
+      }
+    } else {
+      console.log('[FEED] ❌ UserImage or base64 not available:', {
+        userImage: !!userImage,
+        base64: userImage?.base64 ? 'exists' : 'missing'
+      });
+    }
+  }, [userImage, hasInitialized, initializeIntelligentFeed, triggerSmartPreload]);
+
   // Performance monitoring
   useEffect(() => {
     const monitoringInterval = setInterval(() => {

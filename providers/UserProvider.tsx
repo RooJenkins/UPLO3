@@ -28,7 +28,7 @@ export const [UserProvider, useUser] = createContextHook(() => {
   const { getItem, setItem, removeItem } = useStorage();
 
   const loadUserData = useCallback(async () => {
-    console.log('UserProvider: Starting to load user data...');
+    console.log('[USER] 🔍 Starting to load user data...');
     try {
       // Load basic user state
       const stored = await getItem(USER_STORAGE_KEY);
@@ -64,14 +64,24 @@ export const [UserProvider, useUser] = createContextHook(() => {
         }
       }
       
+      // For debugging - validate onboarding state
+      const shouldBeOnboarded = isOnboarded && userImage && userImage.base64;
+
+      console.log('[USER] 🔍 Final state evaluation:', {
+        storedOnboarded: isOnboarded,
+        hasUserImage: !!userImage,
+        hasBase64: !!(userImage?.base64),
+        finalOnboardedState: shouldBeOnboarded
+      });
+
       // Set all state at once to avoid multiple renders
       setState({
-        isOnboarded,
+        isOnboarded: shouldBeOnboarded, // Only consider onboarded if we have both flag and image with base64
         userImage,
         isLoading: false,
       });
-      
-      console.log('UserProvider: Finished loading user data');
+
+      console.log('[USER] ✅ Finished loading user data - onboarded:', shouldBeOnboarded);
     } catch (error) {
       console.error('Failed to load user data:', error);
       setState({

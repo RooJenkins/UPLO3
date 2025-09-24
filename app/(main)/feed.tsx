@@ -37,7 +37,7 @@ export default function FeedScreen() {
     scrollVelocity,
     workerStats,
   } = useFeed();
-  const { userImage } = useUser();
+  const { userImage, clearUserData } = useUser();
   const [hasScrolled, setHasScrolled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   
@@ -105,6 +105,12 @@ export default function FeedScreen() {
               <Text style={styles.debugText}>Debug</Text>
             </View>
           </Link>
+          <View
+            style={[styles.debugPill, { backgroundColor: 'rgba(255, 0, 0, 0.8)' }]}
+            onTouchEnd={clearUserData}
+          >
+            <Text style={styles.debugText}>Reset</Text>
+          </View>
         </View>
 
         {/* Advanced Loading Stats */}

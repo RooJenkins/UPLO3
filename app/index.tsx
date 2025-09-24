@@ -5,7 +5,14 @@ import { useUser } from '@/providers/UserProvider';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function IndexScreen() {
-  const { isOnboarded, isLoading } = useUser();
+  const { isOnboarded, isLoading, userImage } = useUser();
+
+  console.log('[INDEX] 🔍 Routing decision:', {
+    isLoading,
+    isOnboarded,
+    hasUserImage: !!userImage,
+    hasBase64: !!(userImage?.base64)
+  });
 
   useEffect(() => {
     // Hide splash screen after providers are loaded
