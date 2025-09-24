@@ -1,4 +1,4 @@
-import app from '@/backend/hono';
+import app from '@/backend/server';
 
 // Simple health check API route
 export async function GET() {

@@ -6,20 +6,28 @@ import superjson from 'superjson';
 export const trpc = createTRPCReact<AppRouter>();
 
 function getBaseUrl() {
+  // Prefer explicit backend base URL when provided (works on Rork/hosted)
+  const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (envBase) {
+    console.log('[TRPC] Using EXPO_PUBLIC_API_BASE_URL:', envBase);
+    return envBase.replace(/\/$/, '');
+  }
+
   if (typeof window !== 'undefined') {
-    // Browser environment
+    // Browser environment (dev)
     const baseUrl = window.location.origin;
     console.log('[TRPC] Browser base URL:', baseUrl);
     return baseUrl;
   }
   
-  // Default fallback
+  // Default fallback for native dev
   console.log('[TRPC] Using fallback URL: http://localhost:8081');
   return 'http://localhost:8081';
 }
 
 const baseUrl = getBaseUrl();
-const trpcUrl = `${baseUrl}/api/trpc`;
+// If envBase already includes /api, avoid duplicating
+const trpcUrl = baseUrl.endsWith('/api') ? `${baseUrl}/trpc` : `${baseUrl}/api/trpc`;
 console.log('[TRPC] Full tRPC URL:', trpcUrl);
 
 export const trpcClient = trpc.createClient({

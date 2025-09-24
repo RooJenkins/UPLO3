@@ -29,7 +29,11 @@ export default function DebugScreen() {
   const testTrpcDirect = async () => {
     addLog('Testing tRPC direct...');
     try {
-      const url = '/api/trpc/example.hello';
+      const envBase = (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_BASE_URL) || '';
+      const base = envBase || (typeof window !== 'undefined' ? window.location.origin : '');
+      const url = base
+        ? (base.endsWith('/api') ? `${base}/trpc/example.hello` : `${base}/api/trpc/example.hello`)
+        : '/api/trpc/example.hello';
       addLog(`Testing URL: ${url}`);
       
       const response = await fetch(url, {
