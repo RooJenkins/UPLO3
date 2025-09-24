@@ -135,10 +135,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     isGenerating,
     generateOutfit,
     // Placeholder functions for compatibility
-    queueGeneration: () => {},
-    processQueue: async () => {},
-    generateInitialFeed: () => {},
-    preloadNextOutfits: () => {},
+    queueGeneration: (_prompt?: string, _userImageBase64?: string) => {},
+    processQueue: async (_userImageBase64?: string) => {},
+    generateInitialFeed: (_userImageBase64?: string) => {},
+    preloadNextOutfits: (_userImageBase64?: string) => {},
     generationQueue: [],
     preloadedUrls: new Set(),
     cloudSyncStatus: {

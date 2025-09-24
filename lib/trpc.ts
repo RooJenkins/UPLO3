@@ -31,27 +31,29 @@ const trpcUrl = baseUrl.endsWith('/api') ? `${baseUrl}/trpc` : `${baseUrl}/api/t
 console.log('[TRPC] Full tRPC URL:', trpcUrl);
 
 export const trpcClient = trpc.createClient({
-  transformer: superjson,
   links: [
     httpLink({
       url: trpcUrl,
+      transformer: superjson,
       fetch: (url, options) => {
         console.log('[TRPC] Fetching:', url);
         console.log('[TRPC] Options:', options);
-        return fetch(url, options).then(response => {
-          console.log('[TRPC] Response status:', response.status);
-          console.log('[TRPC] Response ok:', response.ok);
-          if (!response.ok) {
-            return response.text().then(text => {
-              console.error('[TRPC] Error response body:', text);
-              throw new Error(`HTTP ${response.status}: ${text}`);
-            });
-          }
-          return response;
-        }).catch(error => {
-          console.error('[TRPC] Fetch error:', error);
-          throw error;
-        });
+        return fetch(url, options)
+          .then((response) => {
+            console.log('[TRPC] Response status:', response.status);
+            console.log('[TRPC] Response ok:', response.ok);
+            if (!response.ok) {
+              return response.text().then((text) => {
+                console.error('[TRPC] Error response body:', text);
+                throw new Error(`HTTP ${response.status}: ${text}`);
+              });
+            }
+            return response;
+          })
+          .catch((error) => {
+            console.error('[TRPC] Fetch error:', error);
+            throw error;
+          });
       },
     }),
   ],
