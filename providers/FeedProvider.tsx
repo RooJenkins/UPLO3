@@ -69,36 +69,59 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Simple generate function without tRPC for now
+  // Generate using direct cloud API (fallback that works on web when API routes are unavailable)
   const generateOutfit = useCallback(async (prompt: string, userImageBase64: string) => {
     try {
       setIsGenerating(true);
-      
-      // Mock generation for now - replace with tRPC later
-      const mockOutfit: FeedEntry = {
+      if (!prompt?.trim() || !userImageBase64?.trim()) return;
+
+      // Call Rork toolkit image edit API directly
+      const response = await fetch('https://toolkit.rork.com/images/edit/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Change the person's outfit to: ${prompt.trim()}. Keep the person's face and pose. Full body.`,
+          images: [{ type: 'image', image: userImageBase64 }],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Cloud edit failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data: any = await response.json();
+      const image = data?.image;
+      const imageUrl = image?.base64Data && image?.mimeType
+        ? `data:${image.mimeType};base64,${image.base64Data}`
+        : `https://via.placeholder.com/400x600/FF6B6B/FFFFFF?text=${encodeURIComponent('Fallback')}`;
+
+      const entry: FeedEntry = {
         id: Date.now().toString(),
-        imageUrl: `https://via.placeholder.com/400x600/FF6B6B/FFFFFF?text=${encodeURIComponent(prompt)}`,
+        imageUrl,
         prompt,
         outfitId: `outfit_${Date.now()}`,
         items: [
-          { id: '1', name: 'Generated T-Shirt', brand: 'AI Fashion', price: '$29.99', category: 'tops' },
-          { id: '2', name: 'Generated Pants', brand: 'AI Fashion', price: '$59.99', category: 'bottoms' },
+          { id: '1', name: 'White Tee', brand: 'AI', price: '$29.99', category: 'tops' },
+          { id: '2', name: 'Blue Jeans', brand: 'AI', price: '$59.99', category: 'bottoms' },
         ],
-        metadata: {
-          style: 'generated',
-          occasion: 'ai-created',
-          season: 'all',
-          colors: ['generated'],
-        },
+        metadata: { style: 'generated', occasion: 'ai', season: 'all', colors: ['auto'] },
         timestamp: Date.now(),
       };
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setFeed(prev => [mockOutfit, ...prev]);
+      setFeed(prev => [entry, ...prev]);
     } catch (error) {
       console.error('Generate outfit error:', error);
+      // Last-resort placeholder to avoid empty feed
+      const fallback: FeedEntry = {
+        id: `fallback_${Date.now()}`,
+        imageUrl: `https://via.placeholder.com/400x600/999999/FFFFFF?text=${encodeURIComponent('Offline')}`,
+        prompt,
+        outfitId: `outfit_${Date.now()}`,
+        items: [],
+        metadata: { style: 'fallback', occasion: 'n/a', season: 'all', colors: [] },
+        timestamp: Date.now(),
+      };
+      setFeed(prev => [fallback, ...prev]);
     } finally {
       setIsGenerating(false);
     }

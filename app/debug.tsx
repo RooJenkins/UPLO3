@@ -13,12 +13,13 @@ export default function DebugScreen() {
     try {
       const response = await fetch('/api/');
       addLog(`Health check status: ${response.status}`);
-      if (response.ok) {
-        const data = await response.json();
-        addLog(`Health check response: ${JSON.stringify(data)}`);
-      } else {
-        const text = await response.text();
-        addLog(`Health check error: ${text}`);
+      const text = await response.text();
+      addLog(`Health raw body (first 120 chars): ${text.slice(0,120)}`);
+      try {
+        const data = JSON.parse(text);
+        addLog(`Health parsed JSON: ${JSON.stringify(data)}`);
+      } catch (e) {
+        addLog('Health JSON parse failed (likely HTML shell)');
       }
     } catch (error) {
       addLog(`Health check failed: ${error}`);
@@ -44,12 +45,13 @@ export default function DebugScreen() {
       });
       
       addLog(`tRPC status: ${response.status}`);
-      if (response.ok) {
-        const data = await response.json();
-        addLog(`tRPC response: ${JSON.stringify(data)}`);
-      } else {
-        const text = await response.text();
-        addLog(`tRPC error: ${text}`);
+      const text = await response.text();
+      addLog(`tRPC raw body (first 120 chars): ${text.slice(0,120)}`);
+      try {
+        const data = JSON.parse(text);
+        addLog(`tRPC parsed JSON: ${JSON.stringify(data).slice(0,200)}`);
+      } catch (e) {
+        addLog('tRPC JSON parse failed (likely HTML shell)');
       }
     } catch (error) {
       addLog(`tRPC failed: ${error}`);
