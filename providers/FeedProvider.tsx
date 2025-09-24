@@ -496,20 +496,20 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     });
   }, [currentIndex, feed, queueGeneration]);
 
+  // Safe setCurrentIndex function - must be outside useMemo to follow Rules of Hooks
+  const safeSetCurrentIndex = useCallback((index: number | ((prev: number) => number)) => {
+    if (typeof index === 'function') {
+      setCurrentIndex(prev => {
+        const newIndex = index(prev);
+        return typeof newIndex === 'number' ? Math.max(0, newIndex) : prev;
+      });
+    } else {
+      setCurrentIndex(Math.max(0, index));
+    }
+  }, []);
+
   const contextValue = useMemo(() => {
     console.log('FeedProvider: Creating context value, feed length:', feed.length);
-
-    // Ensure all functions are properly bound and safe
-    const safeSetCurrentIndex = useCallback((index: number | ((prev: number) => number)) => {
-      if (typeof index === 'function') {
-        setCurrentIndex(prev => {
-          const newIndex = index(prev);
-          return typeof newIndex === 'number' ? Math.max(0, newIndex) : prev;
-        });
-      } else {
-        setCurrentIndex(Math.max(0, index));
-      }
-    }, []);
 
     // Always return a consistent structure - this is critical for preventing undefined errors
     const baseReturn = {
