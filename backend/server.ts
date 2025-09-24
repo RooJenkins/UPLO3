@@ -22,7 +22,7 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Simple health check
+// Simple health check (mounted at /api/ by Expo route)
 app.get('/', (c) => {
   console.log('[BACKEND] Health check endpoint hit');
   return c.json({ 
@@ -32,8 +32,8 @@ app.get('/', (c) => {
   });
 });
 
-// Mount tRPC
-console.log('[BACKEND] Mounting tRPC at /trpc/*');
+// Mount tRPC (Expo will mount this under /api/trpc/*)
+console.log('[BACKEND] Mounting tRPC at /trpc/* (will be available at /api/trpc/*)');
 app.use('/trpc/*', trpcServer({
   router: appRouter,
   createContext: createTRPCContext,
