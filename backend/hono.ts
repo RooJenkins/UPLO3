@@ -29,16 +29,21 @@ app.get("/", (c) => {
 });
 
 // Mount tRPC router - this will handle all tRPC requests
-app.use(
-  "/trpc/*",
-  trpcServer({
-    router: appRouter,
-    createContext,
-    onError: ({ error, path }) => {
-      console.error(`tRPC Error on ${path}:`, error);
-    },
-  })
-);
+try {
+  app.use(
+    "/trpc/*",
+    trpcServer({
+      router: appRouter,
+      createContext,
+      onError: ({ error, path }) => {
+        console.error(`tRPC Error on ${path}:`, error);
+      },
+    })
+  );
+  console.log('tRPC server mounted successfully at /trpc/*');
+} catch (error) {
+  console.error('Failed to mount tRPC server:', error);
+}
 
 // Add a test endpoint to verify the server is working
 app.get("/test", (c) => {
@@ -48,11 +53,11 @@ app.get("/test", (c) => {
 
 // Add a debug endpoint to show all routes
 app.get("/debug", (c) => {
-  return c.json({ 
-    message: "Debug info", 
+  return c.json({
+    message: "Debug info",
     routes: [
       'GET /',
-      'GET /test', 
+      'GET /test',
       'GET /debug',
       'ALL /trpc/*'
     ],
@@ -61,8 +66,30 @@ app.get("/debug", (c) => {
       outfit: { generate: 'available' },
       feed: { save: 'available', list: 'available', clear: 'available' }
     },
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
+});
+
+// Test tRPC routes directly
+app.get("/test-trpc", async (c) => {
+  try {
+    // Simple test to verify tRPC is working
+    console.log('Testing tRPC routes...');
+    return c.json({
+      message: "tRPC test endpoint",
+      availableRoutes: [
+        'POST /api/trpc/example.hi',
+        'POST /api/trpc/outfit.generate',
+        'POST /api/trpc/feed.save',
+        'GET /api/trpc/feed.list',
+        'POST /api/trpc/feed.clear'
+      ],
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('tRPC test failed:', error);
+    return c.json({ error: 'tRPC test failed', details: error }, 500);
+  }
 });
 
 console.log('Hono backend initialized successfully');

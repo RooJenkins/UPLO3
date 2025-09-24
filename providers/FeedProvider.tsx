@@ -94,7 +94,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const preloadImage = useCallback((url: string) => {
     if (!url?.trim() || url.length > 2000) return; // Validate URL
     if (preloadedUrls.has(url)) return;
-    
+
     const img = new Image();
     img.onload = () => {
       setPreloadedUrls(prev => new Set([...prev, url]));
@@ -104,7 +104,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       console.warn(`Failed to preload image: ${url.substring(0, 50)}...`);
     };
     img.src = url;
-  }, [preloadedUrls]);
+  }, []); // Remove preloadedUrls dependency to prevent re-renders
 
   const cleanupOldEntries = useCallback((entries: FeedEntry[]): FeedEntry[] => {
     if (!Array.isArray(entries) || entries.length === 0 || entries.length > 100) return []; // Validate entries
@@ -273,7 +273,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     };
     
     loadCachedEntries();
-  }, [getItem, isInitialized, preloadImage]);
+  }, [getItem, isInitialized]);
 
   // Sync with cloud cache when available
   useEffect(() => {
@@ -309,7 +309,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         return sorted;
       });
     }
-  }, [isInitialized, feedQuery.data, saveFeedToStorage, preloadImage]);
+  }, [isInitialized, feedQuery.data, saveFeedToStorage]);
 
   // Generate outfit using cloud-first tRPC backend with fallback
   const generateOutfit = useCallback(async (prompt: string, userImageBase64: string) => {
@@ -491,15 +491,28 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         queueGeneration(prompt.trim(), priority);
       }
     });
-  }, [currentIndex, feed, queueGeneration, preloadImage]);
+  }, [currentIndex, feed, queueGeneration]);
 
   const contextValue = useMemo(() => {
     console.log('FeedProvider: Creating context value, feed length:', feed.length);
+
+    // Ensure all functions are properly bound and safe
+    const safeSetCurrentIndex = useCallback((index: number | ((prev: number) => number)) => {
+      if (typeof index === 'function') {
+        setCurrentIndex(prev => {
+          const newIndex = index(prev);
+          return typeof newIndex === 'number' ? Math.max(0, newIndex) : prev;
+        });
+      } else {
+        setCurrentIndex(Math.max(0, index));
+      }
+    }, []);
+
     // Always return a consistent structure - this is critical for preventing undefined errors
     const baseReturn = {
       feed: Array.isArray(feed) ? feed : [],
       currentIndex: typeof currentIndex === 'number' ? currentIndex : 0,
-      setCurrentIndex: typeof setCurrentIndex === 'function' ? setCurrentIndex : () => {},
+      setCurrentIndex: safeSetCurrentIndex,
       isLoading: Boolean(isLoading || feedQuery?.isLoading),
       isGenerating: Boolean(isGenerating || generateOutfitMutation?.isPending),
       queueGeneration: typeof queueGeneration === 'function' ? queueGeneration : () => {},
@@ -515,8 +528,6 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         error: feedQuery?.error || null,
       },
     };
-
-
 
     console.log('FeedProvider: Returning context value:', {
       feedLength: baseReturn.feed.length,
@@ -540,7 +551,6 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     feedQuery?.isError,
     feedQuery?.error,
     generateOutfitMutation?.isPending,
-    setCurrentIndex,
   ]);
   
   console.log('FeedProvider: Context hook initialized, returning value');

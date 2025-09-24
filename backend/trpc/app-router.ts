@@ -9,6 +9,15 @@ import {
 
 console.log('tRPC app-router loading...');
 
+// Verify all procedures are properly imported
+console.log('Imported procedures:', {
+  hiProcedure: typeof hiProcedure,
+  generateOutfitProcedure: typeof generateOutfitProcedure,
+  saveFeedEntryProcedure: typeof saveFeedEntryProcedure,
+  getFeedEntriesProcedure: typeof getFeedEntriesProcedure,
+  clearFeedCacheProcedure: typeof clearFeedCacheProcedure,
+});
+
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
     hi: hiProcedure,
@@ -26,3 +35,8 @@ export const appRouter = createTRPCRouter({
 export type AppRouter = typeof appRouter;
 
 console.log('tRPC app-router loaded successfully');
+console.log('App router structure:', {
+  example: { hi: 'available' },
+  outfit: { generate: 'available' },
+  feed: { save: 'available', list: 'available', clear: 'available' },
+});
