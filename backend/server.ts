@@ -4,6 +4,9 @@ import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './trpc/router';
 import { createTRPCContext } from './trpc/context';
 
+console.log('[BACKEND] Initializing backend server...');
+console.log('[BACKEND] AppRouter type:', typeof appRouter);
+
 const app = new Hono();
 
 // CORS middleware
@@ -13,8 +16,15 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// Add request logging
+app.use('*', async (c, next) => {
+  console.log(`[BACKEND] ${c.req.method} ${c.req.url}`);
+  await next();
+});
+
 // Simple health check
 app.get('/', (c) => {
+  console.log('[BACKEND] Health check endpoint hit');
   return c.json({ 
     status: 'ok', 
     message: 'UPLO3 API Server',
@@ -23,9 +33,15 @@ app.get('/', (c) => {
 });
 
 // Mount tRPC
+console.log('[BACKEND] Mounting tRPC at /trpc/*');
 app.use('/trpc/*', trpcServer({
   router: appRouter,
   createContext: createTRPCContext,
+  onError: ({ error, path }) => {
+    console.error(`[BACKEND] tRPC Error on ${path}:`, error);
+  },
 }));
+
+console.log('[BACKEND] Server setup complete');
 
 export default app;
