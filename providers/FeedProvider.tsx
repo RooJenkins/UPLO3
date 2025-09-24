@@ -424,7 +424,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     } finally {
       setIsGenerating(false);
     }
-  }, [generateOutfitMutation, saveFeedMutation, saveFeedToStorage, preloadImage]);
+  }, [generateOutfitMutation, saveFeedMutation, saveFeedToStorage]);
 
 
 

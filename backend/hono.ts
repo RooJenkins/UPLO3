@@ -36,19 +36,18 @@ console.log('[HONO] AppRouter _def:', !!appRouter._def);
 console.log('[HONO] AppRouter procedures:', Object.keys(appRouter._def?.procedures || {}));
 
 try {
-  const trpcMiddleware = trpcServer({
-    router: appRouter,
-    createContext,
-    onError: ({ error, path }) => {
-      console.error(`[HONO] tRPC Error on ${path}:`, error);
-    },
-  });
+  app.use(
+    "/trpc/*",
+    trpcServer({
+      router: appRouter,
+      createContext,
+      onError: ({ error, path }) => {
+        console.error(`[HONO] tRPC Error on ${path}:`, error);
+      },
+    })
+  );
 
-  console.log('[HONO] tRPC middleware created successfully');
-
-  app.use("/trpc/*", trpcMiddleware);
-
-  console.log('[HONO] tRPC middleware mounted successfully');
+  console.log('[HONO] tRPC middleware mounted successfully at /trpc/*');
 } catch (error) {
   console.error('[HONO] Failed to mount tRPC middleware:', error);
 }
