@@ -25,6 +25,32 @@ function getBaseUrl() {
   return 'http://localhost:8081';
 }
 
+// Function to check if API is working and fallback to external if needed
+async function checkApiHealth(baseUrl: string): Promise<string> {
+  try {
+    const healthUrl = `${baseUrl}/api/`;
+    const response = await fetch(healthUrl, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(3000) // 3 second timeout
+    });
+    
+    if (response.ok) {
+      const text = await response.text();
+      // Check if we got JSON instead of HTML
+      if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+        console.log('[TRPC] API health check passed');
+        return baseUrl;
+      }
+    }
+    
+    console.log('[TRPC] API health check failed, falling back to external API');
+    return 'https://toolkit.rork.com';
+  } catch (error) {
+    console.log('[TRPC] API health check error, falling back to external API:', error);
+    return 'https://toolkit.rork.com';
+  }
+}
+
 const baseUrl = getBaseUrl();
 // If envBase already includes /api, avoid duplicating
 const trpcUrl = baseUrl.endsWith('/api') ? `${baseUrl}/trpc` : `${baseUrl}/api/trpc`;

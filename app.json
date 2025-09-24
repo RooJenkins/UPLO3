@@ -54,6 +54,16 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "server": {
+      "routes": {
+        "api/*": {
+          "ssr": false
+        }
+      }
+    },
+    "extra": {
+      "apiBaseUrl": "https://toolkit.rork.com"
     }
   }
 }

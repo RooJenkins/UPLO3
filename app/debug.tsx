@@ -26,6 +26,25 @@ export default function DebugScreen() {
     }
   };
 
+  const testApiRouting = async () => {
+    addLog('Testing API routing...');
+    try {
+      // Test simple test endpoint
+      const testResponse = await fetch('/api/test');
+      addLog(`Test endpoint status: ${testResponse.status}`);
+      const testText = await testResponse.text();
+      addLog(`Test raw body (first 120 chars): ${testText.slice(0,120)}`);
+      
+      // Test plain endpoint
+      const plainResponse = await fetch('/api/plain');
+      addLog(`Plain endpoint status: ${plainResponse.status}`);
+      const plainText = await plainResponse.text();
+      addLog(`Plain raw body: ${plainText}`);
+    } catch (error) {
+      addLog(`API routing test failed: ${error}`);
+    }
+  };
+
   const testTrpcDirect = async () => {
     addLog('Testing tRPC direct...');
     try {
@@ -68,6 +87,14 @@ export default function DebugScreen() {
       addLog(`Origin: ${window.location.origin}`);
       addLog(`Pathname: ${window.location.pathname}`);
     }
+    
+    // Check environment variables
+    const envBase = (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_BASE_URL) || '';
+    if (envBase) {
+      addLog(`Using EXPO_PUBLIC_API_BASE_URL: ${envBase}`);
+    } else {
+      addLog('No EXPO_PUBLIC_API_BASE_URL set');
+    }
   };
 
   const clearLogs = () => {
@@ -85,6 +112,10 @@ export default function DebugScreen() {
         
         <TouchableOpacity style={styles.button} onPress={testHealthCheck}>
           <Text style={styles.buttonText}>Test Health</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.button} onPress={testApiRouting}>
+          <Text style={styles.buttonText}>Test API Routes</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.button} onPress={testTrpcDirect}>
