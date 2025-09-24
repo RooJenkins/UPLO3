@@ -19,6 +19,7 @@ function RootLayoutNav() {
       <Stack.Screen name="outfit-detail" options={{ presentation: "modal" }} />
       <Stack.Screen name="image-viewer" options={{ presentation: "modal" }} />
       <Stack.Screen name="backend-test" options={{ presentation: "modal" }} />
+      <Stack.Screen name="debug" options={{ presentation: "modal" }} />
     </Stack>
   );
 }

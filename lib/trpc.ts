@@ -1,5 +1,5 @@
 import { createTRPCReact } from '@trpc/react-query';
-import { httpBatchLink } from '@trpc/client';
+import { httpLink } from '@trpc/client';
 import type { AppRouter } from '@/backend/trpc/router';
 import superjson from 'superjson';
 
@@ -25,7 +25,7 @@ console.log('[TRPC] Full tRPC URL:', trpcUrl);
 export const trpcClient = trpc.createClient({
   transformer: superjson,
   links: [
-    httpBatchLink({
+    httpLink({
       url: trpcUrl,
       fetch: (url, options) => {
         console.log('[TRPC] Fetching:', url);
@@ -33,6 +33,12 @@ export const trpcClient = trpc.createClient({
         return fetch(url, options).then(response => {
           console.log('[TRPC] Response status:', response.status);
           console.log('[TRPC] Response ok:', response.ok);
+          if (!response.ok) {
+            return response.text().then(text => {
+              console.error('[TRPC] Error response body:', text);
+              throw new Error(`HTTP ${response.status}: ${text}`);
+            });
+          }
           return response;
         }).catch(error => {
           console.error('[TRPC] Fetch error:', error);
