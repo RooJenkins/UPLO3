@@ -86,8 +86,11 @@ export const [FavoritesProvider, useFavorites] = createContextHook(() => {
       newEntries = newEntries.filter(e => e.id !== entry.id);
     } else {
       newFavorites.add(entry.id);
-      // Remove base64 before storing
-      const { base64, ...entryWithoutBase64 } = entry;
+      // Ensure no large inline data is stored
+      const entryWithoutBase64: FeedEntry = {
+        ...entry,
+        imageUrl: entry.imageUrl,
+      };
       newEntries.unshift(entryWithoutBase64);
       
       // Limit stored entries

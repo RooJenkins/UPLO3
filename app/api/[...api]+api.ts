@@ -2,51 +2,57 @@ import app from '@/backend/server';
 
 console.log('[API-ROUTE] Loading API route, app type:', typeof app);
 
-// Standard Expo API route pattern
-export async function GET(request: Request) {
-  console.log('[API-ROUTE] GET request to:', request.url);
+function stripApiPrefix(request: Request): Request {
+  const incomingUrl = new URL(request.url);
+  // Normalize: remove leading /api or /api/ once
+  if (incomingUrl.pathname.startsWith('/api')) {
+    const newPath = incomingUrl.pathname.replace(/^\/api\/?/, '/');
+    const adjustedUrl = new URL(incomingUrl.origin + newPath + incomingUrl.search);
+    return new Request(adjustedUrl, request);
+  }
+  return request;
+}
+
+async function handle(request: Request) {
+  const forwarded = stripApiPrefix(request);
   try {
-    const response = await app.fetch(request);
-    console.log('[API-ROUTE] GET response status:', response.status);
+    const response = await app.fetch(forwarded);
     return response;
   } catch (error) {
-    console.error('[API-ROUTE] GET error:', error);
-    return new Response(JSON.stringify({ error: 'GET request failed', details: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('[API-ROUTE] Handler error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Request failed', details: String(error) }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
+}
+
+// Exported for tests only; ignored by the Expo router
+export { stripApiPrefix as __stripApiPrefixForTests, handle as __apiHandleForTests };
+
+// Standard Expo API route pattern
+export async function GET(request: Request) {
+  return handle(request);
 }
 
 export async function POST(request: Request) {
-  console.log('[API-ROUTE] POST request to:', request.url);
-  try {
-    const response = await app.fetch(request);
-    console.log('[API-ROUTE] POST response status:', response.status);
-    return response;
-  } catch (error) {
-    console.error('[API-ROUTE] POST error:', error);
-    return new Response(JSON.stringify({ error: 'POST request failed', details: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+  return handle(request);
 }
 
 export async function PUT(request: Request) {
-  return app.fetch(request);
+  return handle(request);
 }
 
 export async function DELETE(request: Request) {
-  return app.fetch(request);
+  return handle(request);
 }
 
 export async function PATCH(request: Request) {
-  return app.fetch(request);
+  return handle(request);
 }
 
 export async function OPTIONS(request: Request) {
-  return app.fetch(request);
+  return handle(request);
 }
 
 export default app;

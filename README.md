@@ -305,6 +305,18 @@ For mobile apps, you'll configure your app's deep linking scheme in `app.json`.
 2. Delete `node_modules` and reinstall: `rm -rf node_modules && bun install`
 3. Check [Expo's troubleshooting guide](https://docs.expo.dev/troubleshooting/build-errors/)
 
+### **Backend API routing**
+
+- API endpoints are served under `/api/*` via Expo Router server functions.
+- The Hono app mounts health at `/` and tRPC at `/trpc/*`, which are exposed as `/api/` and `/api/trpc/*`.
+- A plain text endpoint `/api/plain` returns `OK` to help detect if platform HTML fallback is intercepting API routes.
+
+To point the frontend to a different backend, set:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL="https://your-host/api"
+```
+
 ### **Need help with native features?**
 
 - Check [Expo's documentation](https://docs.expo.dev/) for native APIs

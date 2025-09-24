@@ -32,6 +32,13 @@ app.get('/', (c) => {
   });
 });
 
+// Plain-text endpoint to detect platform routing interception easily
+app.get('/plain', (c) => {
+  return c.text('OK', 200, {
+    'Content-Type': 'text/plain; charset=utf-8'
+  });
+});
+
 // Mount tRPC (Expo will mount this under /api/trpc/*)
 console.log('[BACKEND] Mounting tRPC at /trpc/* (will be available at /api/trpc/*)');
 app.use('/trpc/*', trpcServer({
@@ -45,3 +52,5 @@ app.use('/trpc/*', trpcServer({
 console.log('[BACKEND] Server setup complete');
 
 export default app;
+// Export for tests
+export { app as __honoAppForTests };
