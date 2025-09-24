@@ -110,11 +110,18 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           },
           timestamp: cachedImage.timestamp,
         };
+        // Ensure the array is large enough before setting
+        while (newFeed.length <= i) {
+          newFeed.push(undefined as any);
+        }
         newFeed[i] = feedEntry;
       }
     }
 
-    setFeed(newFeed);
+    // Filter out undefined entries before setting state
+    const validFeed = newFeed.filter(Boolean);
+
+    setFeed(validFeed);
     setLoadingStats(stats);
   }, [loadingService]);
 

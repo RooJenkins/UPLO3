@@ -74,6 +74,9 @@ export default function FeedScreen() {
   }).current;
 
   const renderItem = ({ item, index }: { item: any; index: number }) => {
+    if (!item) {
+      return <LoadingCard />;
+    }
     if (item.isGenerating) {
       return <LoadingCard />;
     }
@@ -86,10 +89,10 @@ export default function FeedScreen() {
     index,
   });
 
-  // Add loading cards to the feed for smooth UX
-  const displayFeed: (FeedEntry | { id: string; isGenerating: true })[] = [...feed];
-  if (feed.length < 8) { // Increased for better preloading
-    for (let i = feed.length; i < 8; i++) {
+  // Add loading cards to the feed for smooth UX - filter out any undefined entries
+  const displayFeed: (FeedEntry | { id: string; isGenerating: true })[] = [...feed.filter(Boolean)];
+  if (displayFeed.length < 8) { // Increased for better preloading
+    for (let i = displayFeed.length; i < 8; i++) {
       displayFeed.push({ id: `loading_${i}`, isGenerating: true });
     }
   }
@@ -159,7 +162,7 @@ export default function FeedScreen() {
         ref={flatListRef}
         data={displayFeed}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item?.id || `fallback_${index}`}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={SCREEN_HEIGHT}
