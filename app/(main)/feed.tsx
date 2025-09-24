@@ -115,14 +115,7 @@ export default function FeedScreen() {
     return null;
   };
 
-  if (isLoading && feed.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <LoadingCard />
-        <StatusBar style="light" />
-      </SafeAreaView>
-    );
-  }
+  // Removed early return to fix React Hooks order violation
 
   const statusContainerStyle = {
     ...styles.statusContainer,
