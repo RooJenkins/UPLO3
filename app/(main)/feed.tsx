@@ -15,6 +15,7 @@ import { FeedCard } from '@/components/FeedCard';
 import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { LoadingCard } from '@/components/LoadingCard';
 import { TrpcStatus } from '@/components/TrpcStatus';
+import { LoadingStats } from '@/components/LoadingStats';
 import { Wifi, Cloud, CloudOff } from 'lucide-react-native';
 import { Link } from 'expo-router';
 
@@ -22,16 +23,19 @@ export default function FeedScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   
-  const { 
-    feed, 
-    currentIndex, 
-    setCurrentIndex, 
-    isLoading, 
-    processQueue, 
-    generateInitialFeed, 
+  const {
+    feed,
+    currentIndex,
+    setCurrentIndex,
+    isLoading,
+    processQueue,
+    generateInitialFeed,
     preloadNextOutfits,
     preloadedUrls,
     cloudSyncStatus,
+    loadingStats,
+    scrollVelocity,
+    workerStats,
   } = useFeed();
   const { userImage } = useUser();
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -93,13 +97,24 @@ export default function FeedScreen() {
   // Cloud sync status indicator
   const renderCloudStatus = () => {
     return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TrpcStatus style={styles.cloudStatus} />
-        <Link href="/debug" asChild>
-          <View style={styles.debugPill}>
-            <Text style={styles.debugText}>Debug</Text>
-          </View>
-        </Link>
+      <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TrpcStatus style={styles.cloudStatus} />
+          <Link href="/debug" asChild>
+            <View style={styles.debugPill}>
+              <Text style={styles.debugText}>Debug</Text>
+            </View>
+          </Link>
+        </View>
+
+        {/* Advanced Loading Stats */}
+        {loadingStats && (
+          <LoadingStats
+            stats={loadingStats}
+            scrollVelocity={scrollVelocity || 0}
+            style={styles.loadingStats}
+          />
+        )}
       </View>
     );
   };
@@ -207,6 +222,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  loadingStats: {
+    marginTop: 4,
   },
   cloudStatusText: {
     fontSize: 12,
