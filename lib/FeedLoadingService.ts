@@ -40,7 +40,7 @@ export class FeedLoadingService {
   private readonly PRELOAD_AHEAD = 20;
   private readonly CACHE_BEHIND = 10;
   private readonly MAX_RETRIES = 2;
-  private readonly CACHE_SIZE_LIMIT = 50; // Total images to keep in memory
+  private readonly CACHE_SIZE_LIMIT = 100; // Total images to keep in memory (increased for better UX)
 
   // Scroll prediction
   private scrollVelocity = 0;
@@ -309,24 +309,42 @@ export class FeedLoadingService {
   }
 
   /**
-   * Clean up cache to prevent memory issues
+   * Smart cache cleanup - prioritizes keeping images near user's current position
    */
   private cleanupCache() {
     if (this.imageCache.size <= this.CACHE_SIZE_LIMIT) return;
 
-    // Sort by timestamp (oldest first)
-    const entries = Array.from(this.imageCache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    // Get all cache entries
+    const entries = Array.from(this.imageCache.entries());
 
-    // Remove oldest images until we're under the limit
-    const toRemove = entries.slice(0, this.imageCache.size - this.CACHE_SIZE_LIMIT);
+    // Calculate distance from current scroll position for each cached image
+    const entriesWithDistance = entries.map(([position, image]) => ({
+      position,
+      image,
+      distance: Math.abs(position - this.lastScrollPosition),
+      timestamp: image.timestamp
+    }));
 
-    toRemove.forEach(([position, image]) => {
+    // Sort by distance (keep images closest to current position)
+    // Secondary sort by timestamp (prefer newer images if distance is same)
+    entriesWithDistance.sort((a, b) => {
+      if (a.distance !== b.distance) {
+        return a.distance - b.distance;
+      }
+      return b.timestamp - a.timestamp; // Newer first as tiebreaker
+    });
+
+    // Keep images up to the limit (keep closest ones)
+    const toKeep = entriesWithDistance.slice(0, this.CACHE_SIZE_LIMIT);
+    const toRemove = entriesWithDistance.slice(this.CACHE_SIZE_LIMIT);
+
+    // Remove the furthest images
+    toRemove.forEach(({ position, image }) => {
       this.imageCache.delete(position);
       this.preloadedImages.delete(image.imageUrl);
     });
 
-    console.log('[CLEANUP] Removed', toRemove.length, 'cached images. Cache size:', this.imageCache.size);
+    console.log('[CLEANUP] Smart cleanup: removed', toRemove.length, 'distant images, kept', toKeep.length, 'near position', this.lastScrollPosition);
   }
 
   /**

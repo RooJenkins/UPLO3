@@ -32,7 +32,7 @@ export interface FeedEntry {
 const INITIAL_FEED: FeedEntry[] = [
   {
     id: 'mock-1',
-    imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=600&fit=crop',
+    imageUrl: 'https://via.placeholder.com/400x600/667eea/ffffff?text=Casual+Outfit',
     prompt: 'Casual everyday outfit',
     outfitId: 'mock-outfit-1',
     items: [
@@ -49,7 +49,7 @@ const INITIAL_FEED: FeedEntry[] = [
   },
   {
     id: 'mock-2',
-    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
+    imageUrl: 'https://via.placeholder.com/400x600/4ecdc4/ffffff?text=Business+Outfit',
     prompt: 'Business casual outfit',
     outfitId: 'mock-outfit-2',
     items: [
@@ -84,45 +84,55 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const lastScrollTime = useRef<number>(Date.now());
   const lastScrollIndex = useRef<number>(0);
 
-  // Update feed with cached images
+  // Update feed with cached images - only add NEW images, never replace existing ones
   const updateFeedFromCache = useCallback(() => {
-    const newFeed = [...INITIAL_FEED];
-    const stats = loadingService.getCacheStats();
+    setFeed(currentFeed => {
+      const stats = loadingService.getCacheStats();
+      setLoadingStats(stats);
 
-    // Add cached images to feed
-    for (let i = 2; i < 50; i++) { // Start after initial mock images
-      const cachedImage = loadingService.getImage(i);
-      if (cachedImage) {
-        const feedEntry: FeedEntry = {
-          id: cachedImage.id,
-          imageUrl: cachedImage.imageUrl,
-          prompt: cachedImage.prompt,
-          outfitId: `outfit_${cachedImage.id}`,
-          items: [
-            { id: '1', name: 'AI Generated Top', brand: 'AI Fashion', price: '$29.99', category: 'tops' },
-            { id: '2', name: 'AI Generated Bottom', brand: 'AI Fashion', price: '$59.99', category: 'bottoms' },
-          ],
-          metadata: {
-            style: 'generated',
-            occasion: 'ai-created',
-            season: 'all',
-            colors: ['auto']
-          },
-          timestamp: cachedImage.timestamp,
-        };
-        // Ensure the array is large enough before setting
-        while (newFeed.length <= i) {
-          newFeed.push(undefined as any);
+      // Start with existing feed - NEVER replace existing entries
+      const updatedFeed = [...currentFeed];
+      let hasNewImages = false;
+
+      // Only add new cached images to empty positions
+      for (let i = 2; i < 50; i++) { // Start after initial mock images
+        const cachedImage = loadingService.getImage(i);
+
+        // Only add if we don't already have an image at this position
+        if (cachedImage && (i >= updatedFeed.length || !updatedFeed[i])) {
+          const feedEntry: FeedEntry = {
+            id: cachedImage.id,
+            imageUrl: cachedImage.imageUrl,
+            prompt: cachedImage.prompt,
+            outfitId: `outfit_${cachedImage.id}`,
+            items: [
+              { id: '1', name: 'AI Generated Top', brand: 'AI Fashion', price: '$29.99', category: 'tops' },
+              { id: '2', name: 'AI Generated Bottom', brand: 'AI Fashion', price: '$59.99', category: 'bottoms' },
+            ],
+            metadata: {
+              style: 'generated',
+              occasion: 'ai-created',
+              season: 'all',
+              colors: ['auto']
+            },
+            timestamp: cachedImage.timestamp,
+          };
+
+          // Extend array if needed
+          while (updatedFeed.length <= i) {
+            updatedFeed.push(undefined as any);
+          }
+          updatedFeed[i] = feedEntry;
+          hasNewImages = true;
         }
-        newFeed[i] = feedEntry;
       }
-    }
 
-    // Filter out undefined entries before setting state
-    const validFeed = newFeed.filter(Boolean);
-
-    setFeed(validFeed);
-    setLoadingStats(stats);
+      // Only return new array if we actually added images (prevents unnecessary re-renders)
+      if (hasNewImages) {
+        return updatedFeed.filter(Boolean);
+      }
+      return currentFeed;
+    });
   }, [loadingService]);
 
   // Enhanced scroll tracking with velocity calculation

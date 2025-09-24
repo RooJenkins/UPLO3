@@ -27,6 +27,7 @@ interface FeedCardProps {
 export function FeedCard({ entry, isActive }: FeedCardProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
   const [lastTap, setLastTap] = useState(0);
+  const [imageError, setImageError] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
 
@@ -122,7 +123,20 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
           source={{ uri: entry.imageUrl }}
           style={styles.image}
           resizeMode="cover"
+          onError={() => {
+            console.warn('[FEEDCARD] Image failed to load:', entry.imageUrl);
+            setImageError(true);
+          }}
+          onLoad={() => setImageError(false)}
         />
+
+        {/* Fallback for failed images */}
+        {imageError && (
+          <View style={styles.imageFallback}>
+            <Text style={styles.fallbackText}>Image Error</Text>
+            <Text style={styles.fallbackSubtext}>{entry.prompt}</Text>
+          </View>
+        )}
         
         {/* Double tap heart animation */}
         <Animated.View
@@ -271,5 +285,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  imageFallback: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  fallbackText: {
+    color: '#ff6b6b',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  fallbackSubtext: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });
