@@ -37,7 +37,7 @@ export default function FeedScreen() {
   const flatListRef = useRef<FlatList>(null);
   
   // Test tRPC connection directly
-  const hiQuery = trpc.example.hi.useQuery(
+  const helloQuery = trpc.example.hello.useQuery(
     { name: 'Feed Screen' },
     {
       retry: 1,
@@ -99,7 +99,7 @@ export default function FeedScreen() {
 
   // Cloud sync status indicator
   const renderCloudStatus = () => {
-    if (hiQuery.isLoading) {
+    if (helloQuery.isLoading) {
       return (
         <View style={styles.cloudStatus}>
           <Cloud size={16} color="#ffa500" />
@@ -108,7 +108,7 @@ export default function FeedScreen() {
       );
     }
     
-    if (hiQuery.isError) {
+    if (helloQuery.isError) {
       return (
         <View style={styles.cloudStatus}>
           <CloudOff size={16} color="#ff6b6b" />
@@ -117,7 +117,7 @@ export default function FeedScreen() {
       );
     }
     
-    if (hiQuery.isSuccess) {
+    if (helloQuery.isSuccess) {
       return (
         <View style={styles.cloudStatus}>
           <Cloud size={16} color="#4ecdc4" />

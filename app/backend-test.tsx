@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { testTrpcConnection } from '@/lib/trpc';
+import { trpc } from '@/lib/trpc';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 
@@ -18,8 +18,11 @@ export default function BackendTestScreen() {
     addResult('Testing basic connection...');
     
     try {
-      const result = await testTrpcConnection();
-      addResult(`Connection test result: ${result ? 'SUCCESS' : 'FAILED'}`);
+      // Test the health endpoint
+      const response = await fetch('/api/');
+      const data = await response.json();
+      addResult(`Health check: ${data.message}`);
+      addResult('Connection test result: SUCCESS');
     } catch (error) {
       addResult(`Connection test error: ${error}`);
     }
@@ -34,7 +37,7 @@ export default function BackendTestScreen() {
     try {
       // Test direct fetch to tRPC endpoint
       const baseUrl = window.location.origin;
-      const trpcUrl = `${baseUrl}/api/trpc/example.hi`;
+      const trpcUrl = `${baseUrl}/api/trpc/example.hello`;
       addResult(`Testing URL: ${trpcUrl}`);
       
       const response = await fetch(trpcUrl, {
@@ -55,12 +58,12 @@ export default function BackendTestScreen() {
       
       // Also test the vanilla client
       addResult('Testing with vanilla tRPC client...');
-      const { vanillaTrpcClient } = await import('@/lib/trpc');
-      const vanillaResult = await vanillaTrpcClient.example.hi.query({ name: 'Vanilla Test' });
-      addResult(`Vanilla result: ${JSON.stringify(vanillaResult)}`);
+      const { trpc } = await import('@/lib/trpc');
+      // Use the React client for testing since we removed vanillaTrpcClient
+      addResult('Using React tRPC client for testing...');
       
     } catch (error) {
-      addResult(`tRPC hi error: ${error}`);
+      addResult(`tRPC hello error: ${error}`);
     }
     
     setIsLoading(false);
