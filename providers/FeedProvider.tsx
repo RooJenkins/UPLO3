@@ -67,32 +67,49 @@ const INITIAL_FEED: FeedEntry[] = [
 export const [FeedProvider, useFeed] = createContextHook(() => {
   const [feed, setFeed] = useState<FeedEntry[]>(INITIAL_FEED);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // tRPC hooks
-  const generateMutation = trpc.outfit.generate.useMutation({
-    onSuccess: (data) => {
-      setFeed(prev => [data, ...prev]);
-    },
-  });
-
-  // Simple generate function
+  // Simple generate function without tRPC for now
   const generateOutfit = useCallback(async (prompt: string, userImageBase64: string) => {
     try {
-      await generateMutation.mutateAsync({
+      setIsGenerating(true);
+      
+      // Mock generation for now - replace with tRPC later
+      const mockOutfit: FeedEntry = {
+        id: Date.now().toString(),
+        imageUrl: `https://via.placeholder.com/400x600/FF6B6B/FFFFFF?text=${encodeURIComponent(prompt)}`,
         prompt,
-        userImageBase64,
-      });
+        outfitId: `outfit_${Date.now()}`,
+        items: [
+          { id: '1', name: 'Generated T-Shirt', brand: 'AI Fashion', price: '$29.99', category: 'tops' },
+          { id: '2', name: 'Generated Pants', brand: 'AI Fashion', price: '$59.99', category: 'bottoms' },
+        ],
+        metadata: {
+          style: 'generated',
+          occasion: 'ai-created',
+          season: 'all',
+          colors: ['generated'],
+        },
+        timestamp: Date.now(),
+      };
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setFeed(prev => [mockOutfit, ...prev]);
     } catch (error) {
       console.error('Generate outfit error:', error);
+    } finally {
+      setIsGenerating(false);
     }
-  }, [generateMutation]);
+  }, []);
 
   return {
     feed,
     currentIndex,
     setCurrentIndex,
-    isLoading: generateMutation.isPending,
-    isGenerating: generateMutation.isPending,
+    isLoading: false,
+    isGenerating,
     generateOutfit,
     // Placeholder functions for compatibility
     queueGeneration: () => {},

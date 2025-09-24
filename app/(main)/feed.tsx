@@ -14,8 +14,8 @@ import { useUser } from '@/providers/UserProvider';
 import { FeedCard } from '@/components/FeedCard';
 import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { LoadingCard } from '@/components/LoadingCard';
+import { TrpcStatus } from '@/components/TrpcStatus';
 import { Wifi, Cloud, CloudOff } from 'lucide-react-native';
-import { trpc } from '@/lib/trpc';
 
 export default function FeedScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -36,15 +36,7 @@ export default function FeedScreen() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   
-  // Test tRPC connection directly
-  const helloQuery = trpc.example.hello.useQuery(
-    { name: 'Feed Screen' },
-    {
-      retry: 1,
-      retryDelay: 1000,
-      refetchOnWindowFocus: false,
-    }
-  );
+  // tRPC status is now handled by a separate component
 
   useEffect(() => {
     if (userImage?.base64) {
@@ -99,34 +91,7 @@ export default function FeedScreen() {
 
   // Cloud sync status indicator
   const renderCloudStatus = () => {
-    if (helloQuery.isLoading) {
-      return (
-        <View style={styles.cloudStatus}>
-          <Cloud size={16} color="#ffa500" />
-          <Text style={styles.cloudStatusText}>Testing...</Text>
-        </View>
-      );
-    }
-    
-    if (helloQuery.isError) {
-      return (
-        <View style={styles.cloudStatus}>
-          <CloudOff size={16} color="#ff6b6b" />
-          <Text style={styles.errorStatusText}>Offline</Text>
-        </View>
-      );
-    }
-    
-    if (helloQuery.isSuccess) {
-      return (
-        <View style={styles.cloudStatus}>
-          <Cloud size={16} color="#4ecdc4" />
-          <Text style={styles.successStatusText}>Online</Text>
-        </View>
-      );
-    }
-    
-    return null;
+    return <TrpcStatus style={styles.cloudStatus} />;
   };
 
   // Preload status indicator
