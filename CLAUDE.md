@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**UPLO3** is a React Native + Expo Router mobile app featuring AI-powered outfit generation with tRPC backend integration. Built for the Rork platform with cross-platform deployment capabilities.
+**UPLO3** is a React Native + Expo Router mobile app featuring an advanced 30-worker parallel AI outfit generation system with sophisticated infinite scroll capabilities. Built for the Rork platform with cross-platform deployment capabilities.
+
+### 🚀 **Current State (Updated September 24, 2025)**
+- **Status**: Production-ready with comprehensive "ultrathink" fixes applied
+- **Feed System**: 30 parallel workers for AI outfit generation
+- **Architecture**: Advanced FeedLoadingService with continuous generation
+- **Performance**: Infinite scroll with intelligent preloading and buffer management
+- **Reliability**: Ultra-unique ID generation preventing React key collisions
 
 ### Tech Stack
 - **Frontend**: React Native + Expo Router + TypeScript
@@ -64,7 +71,85 @@ expo lint                       # Run ESLint checks
 └── types/                    # TypeScript type definitions
 ```
 
+## Advanced Feed Loading Architecture
+
+### **FeedLoadingService System**
+The app features a sophisticated 30-worker parallel processing system for AI outfit generation:
+
+```typescript
+class FeedLoadingService {
+  private MAX_WORKERS = 30;  // Parallel processing capacity
+  private workerPool: Array<{ busy: boolean; id: string }>;
+  private continuousGeneration = true; // Infinite scroll support
+
+  // Ultra-unique ID generation prevents React key collisions
+  generateUniqueId = (base: string) =>
+    `${timestamp}_${sessionId}_${processId}_${microTime}_${random}_${index}`;
+}
+```
+
+### **Critical Service Reference Pattern**
+```typescript
+// providers/FeedProvider.tsx - ALWAYS use this pattern
+const loadingService = useRef<FeedLoadingService | null>(null);
+if (!loadingService.current) {
+  loadingService.current = new FeedLoadingService(); // Force fresh instance
+}
+const service = loadingService.current; // Use this reference consistently
+// ❌ NEVER use loadingService.getStats()
+// ✅ ALWAYS use service.getStats()
+```
+
+### **Feed Management Flow**
+1. **Initial Feed**: 2 reliable mock images (Picsum.photos + fallbacks)
+2. **Dynamic Loading**: Positions 2+ filled by 30-worker AI generation
+3. **Buffer Management**: Maintains 20-100 image buffer based on scroll velocity
+4. **Infinite Scroll**: Continuous generation maintains seamless UX
+5. **Duplicate Prevention**: Multi-layer validation prevents image repetition
+
+### **Ultra-Unique ID Generation**
+```typescript
+// Prevents React key collision warnings
+const generateUniqueId = (index: number) => {
+  const microTime = Date.now() + index; // Temporal uniqueness
+  const sessionId = Math.random().toString(36).substring(2, 15);
+  const processId = Math.floor(Math.random() * 100000);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `init_${initTimestamp}_${sessionId}_${processId}_${microTime}_${random}_${index}`;
+};
+```
+
 ### Key Files to Understand
+
+#### **Core Feed Loading System** (Updated September 2025)
+
+#### `lib/FeedLoadingService.ts` - 30-Worker Processing Engine
+- **30 parallel workers** for AI outfit generation
+- **Continuous generation** system for infinite scroll
+- **Enhanced prompt variation** with 4-dimensional uniqueness system
+- **Worker pool management** with intelligent load balancing
+- **Critical**: Contains comprehensive logging for debugging worker issues
+
+#### `providers/FeedProvider.tsx` - Feed State Management & Service Coordination
+- **Service reference management** via useRef pattern
+- **Ultra-unique ID generation** preventing React key collisions
+- **Feed buffer management** and infinite scroll coordination
+- **Mock image handling** with reliable Picsum.photos URLs + fallbacks
+- **Critical**: Recently updated with 17 service reference fixes
+
+#### `components/LoadingStats.tsx` - Worker Monitoring & Diagnostics
+- **Real-time worker count display** (should show "30/30")
+- **Buffer health monitoring** and performance metrics
+- **Efficiency tracking** and scroll velocity analysis
+- **Critical**: Recently updated with missing imports and proper TypeScript support
+
+#### `app/(main)/feed.tsx` - Main Feed UI & Infinite Scroll
+- **FlatList optimization** for performance
+- **Viewability tracking** and scroll management
+- **LoadingStats integration** for real-time monitoring
+- **Swipe gesture handling** and user interaction
+
+#### **Backend & API System**
 
 #### `lib/trpc.ts` - tRPC Client Configuration
 - Handles environment detection (Rork platform vs local)
