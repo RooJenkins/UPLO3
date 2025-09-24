@@ -80,9 +80,9 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const feedQuery = trpc.feed.list.useQuery(
     { limit: MAX_CACHED_ENTRIES },
     { 
-      enabled: false, // Disable cloud sync for now to prevent blocking
-      retry: false,
-      retryDelay: 1000,
+      enabled: true, // Enable cloud sync to test backend
+      retry: 1,
+      retryDelay: 2000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     }
@@ -323,6 +323,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       return;
     }
 
+    console.log(`[FEED] Starting outfit generation for prompt: "${prompt}"`);
+    console.log(`[FEED] User image base64 length: ${userImageBase64.length}`);
     setIsGenerating(true);
     
     // Always generate a fallback first for immediate feedback
