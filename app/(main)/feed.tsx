@@ -16,6 +16,7 @@ import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { LoadingCard } from '@/components/LoadingCard';
 import { TrpcStatus } from '@/components/TrpcStatus';
 import { Wifi, Cloud, CloudOff } from 'lucide-react-native';
+import { Link } from 'expo-router';
 
 export default function FeedScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -91,7 +92,16 @@ export default function FeedScreen() {
 
   // Cloud sync status indicator
   const renderCloudStatus = () => {
-    return <TrpcStatus style={styles.cloudStatus} />;
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TrpcStatus style={styles.cloudStatus} />
+        <Link href="/debug" asChild>
+          <View style={styles.debugPill}>
+            <Text style={styles.debugText}>Debug</Text>
+          </View>
+        </Link>
+      </View>
+    );
   };
 
   // Preload status indicator
@@ -186,6 +196,17 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
+  },
+  debugPill: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   cloudStatusText: {
     fontSize: 12,
