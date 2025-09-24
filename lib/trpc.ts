@@ -37,8 +37,9 @@ const getBaseUrl = () => {
 
 const baseUrl = getBaseUrl();
 const trpcUrl = `${baseUrl}/api/trpc`;
-console.log('tRPC client connecting to:', trpcUrl);
-console.log('Base URL:', baseUrl);
+console.log('[TRPC-CLIENT] tRPC client connecting to:', trpcUrl);
+console.log('[TRPC-CLIENT] Base URL:', baseUrl);
+console.log('[TRPC-CLIENT] Platform:', Platform.OS);
 
 export const trpcClient = trpc.createClient({
   links: [
