@@ -2,6 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { FeedLoadingService, GeneratedImage } from '@/lib/FeedLoadingService';
+import { useUser } from '@/providers/UserProvider';
 
 export interface OutfitItem {
   id: string;
@@ -68,6 +69,9 @@ const INITIAL_FEED: FeedEntry[] = [
 export const [FeedProvider, useFeed] = createContextHook(() => {
   // Advanced loading service
   const loadingService = useRef<FeedLoadingService>(new FeedLoadingService()).current;
+
+  // Get user image from UserProvider
+  const { userImage } = useUser();
 
   // State management
   const [feed, setFeed] = useState<FeedEntry[]>(INITIAL_FEED);
