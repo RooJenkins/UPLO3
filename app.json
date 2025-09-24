@@ -54,6 +54,10 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "web": {
+      "output": "server",
+      "bundler": "metro"
     }
   }
 }
