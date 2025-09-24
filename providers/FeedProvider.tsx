@@ -68,6 +68,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const [feed, setFeed] = useState<FeedEntry[]>(INITIAL_FEED);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationQueue, setGenerationQueue] = useState<string[]>([]);
+  const [hasGeneratedInitial, setHasGeneratedInitial] = useState(false);
 
   // Generate using direct cloud API (fallback that works on web when API routes are unavailable)
   const generateOutfit = useCallback(async (prompt: string, userImageBase64: string) => {
@@ -127,6 +129,60 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }
   }, []);
 
+  // Queue management
+  const queueGeneration = useCallback((prompt?: string) => {
+    if (prompt) {
+      setGenerationQueue(prev => [...prev, prompt]);
+    }
+  }, []);
+
+  // Process the generation queue
+  const processQueue = useCallback(async (userImageBase64?: string) => {
+    if (!userImageBase64 || generationQueue.length === 0 || isGenerating) return;
+
+    const prompt = generationQueue[0];
+    setGenerationQueue(prev => prev.slice(1));
+    await generateOutfit(prompt, userImageBase64);
+  }, [generationQueue, isGenerating, generateOutfit]);
+
+  // Generate initial feed content
+  const generateInitialFeed = useCallback((userImageBase64?: string) => {
+    if (!userImageBase64 || hasGeneratedInitial) return;
+
+    console.log('[FEED] Starting initial feed generation');
+    setHasGeneratedInitial(true);
+
+    const initialPrompts = [
+      "casual summer outfit",
+      "business professional attire",
+      "trendy streetwear look",
+      "elegant evening wear",
+      "cozy weekend outfit"
+    ];
+
+    // Add all prompts to queue
+    initialPrompts.forEach(prompt => queueGeneration(prompt));
+  }, [hasGeneratedInitial, queueGeneration]);
+
+  // Generate more outfits as user scrolls
+  const preloadNextOutfits = useCallback((userImageBase64?: string) => {
+    if (!userImageBase64 || isGenerating) return;
+
+    const shouldGenerateMore = currentIndex >= feed.length - 3;
+    if (shouldGenerateMore && generationQueue.length === 0) {
+      const dynamicPrompts = [
+        "vintage inspired outfit",
+        "athletic wear ensemble",
+        "minimalist chic style",
+        "bohemian fashion look",
+        "smart casual attire"
+      ];
+
+      const randomPrompt = dynamicPrompts[Math.floor(Math.random() * dynamicPrompts.length)];
+      queueGeneration(randomPrompt);
+    }
+  }, [currentIndex, feed.length, isGenerating, generationQueue.length, queueGeneration]);
+
   return {
     feed,
     currentIndex,
@@ -134,15 +190,14 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     isLoading: false,
     isGenerating,
     generateOutfit,
-    // Placeholder functions for compatibility
-    queueGeneration: (_prompt?: string, _userImageBase64?: string) => {},
-    processQueue: async (_userImageBase64?: string) => {},
-    generateInitialFeed: (_userImageBase64?: string) => {},
-    preloadNextOutfits: (_userImageBase64?: string) => {},
-    generationQueue: [],
+    queueGeneration,
+    processQueue,
+    generateInitialFeed,
+    preloadNextOutfits,
+    generationQueue,
     preloadedUrls: new Set(),
     cloudSyncStatus: {
-      isLoading: false,
+      isLoading: isGenerating,
       isError: false,
       error: null,
     },
