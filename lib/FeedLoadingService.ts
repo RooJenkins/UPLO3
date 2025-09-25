@@ -775,13 +775,51 @@ export class FeedLoadingService {
 
   /**
    * Generate fallback image when API is unavailable
+   * Creates both outfit and product fallbacks for hybrid feed
    */
-  private generateFallbackImage(job: LoadingJob): GeneratedImage {
-    // Generate a unique fallback image with Picsum
+  private generateFallbackImage(job: LoadingJob): GeneratedImage | any {
+    // Determine if this position should be a product based on hybrid feed pattern
+    // Products are injected every 3-4 positions starting at position 4
+    const isProductPosition = this.shouldBeProductPosition(job.position);
+
+    if (isProductPosition) {
+      return this.generateProductFallback(job);
+    } else {
+      return this.generateOutfitFallback(job);
+    }
+  }
+
+  /**
+   * Determine if position should show a product (matches FeedProvider logic)
+   */
+  private shouldBeProductPosition(position: number): boolean {
+    if (position < 4) return false; // First 4 are always outfits
+
+    // Check if position matches the product injection pattern (every 3-4 items after position 4)
+    for (let pos = 4; pos <= position; pos += (3 + Math.floor(Math.random() * 2))) {
+      if (Math.abs(pos - position) <= 1) { // Allow 1 position variance
+        return true;
+      }
+    }
+
+    // Alternative pattern: every 3-4 positions starting from 4
+    const distanceFromStart = position - 4;
+    if (distanceFromStart >= 0) {
+      const cyclePosition = distanceFromStart % 4;
+      return cyclePosition === 0 || (cyclePosition === 1 && Math.random() < 0.5);
+    }
+
+    return false;
+  }
+
+  /**
+   * Generate outfit fallback (original behavior)
+   */
+  private generateOutfitFallback(job: LoadingJob): GeneratedImage {
     const imageId = Math.abs(job.position * 37 + 101) % 1000;
     const imageUrl = `https://picsum.photos/400/600?random=${imageId}`;
 
-    console.log('[FALLBACK] 🎨 Generated fallback image for position', job.position);
+    console.log('[FALLBACK] 🎨 Generated outfit fallback for position', job.position);
 
     return {
       id: job.id,
@@ -789,6 +827,83 @@ export class FeedLoadingService {
       prompt: job.prompt,
       position: job.position,
       cached: true,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Generate product fallback for hybrid feed shopping experience
+   */
+  private generateProductFallback(job: LoadingJob): any {
+    // Generate unique product data
+    const productId = Math.abs(job.position * 23 + 47) % 10000;
+    const imageId = Math.abs(job.position * 41 + 73) % 1000;
+
+    // Fashion brand names for fallback
+    const brands = ['Nike', 'Zara', 'H&M', 'ASOS', 'Uniqlo', 'Forever 21', 'Urban Outfitters', 'Gap'];
+    const categories = ['T-Shirts', 'Jeans', 'Sneakers', 'Dresses', 'Jackets', 'Hoodies', 'Tops', 'Pants'];
+    const colors = ['Black', 'White', 'Navy', 'Grey', 'Blue', 'Red', 'Pink', 'Green'];
+    const sizes = ['XS', 'S', 'M', 'L', 'XL'];
+
+    const brandIndex = productId % brands.length;
+    const categoryIndex = (productId + 1) % categories.length;
+    const colorIndex = (productId + 2) % colors.length;
+
+    const brand = brands[brandIndex];
+    const category = categories[categoryIndex];
+    const color = colors[colorIndex];
+
+    // Generate price (in cents)
+    const basePrice = (2000 + (productId % 8000)); // $20-100 range
+    const isOnSale = (productId % 4) === 0; // 25% on sale
+    const salePrice = isOnSale ? Math.floor(basePrice * 0.7) : null;
+
+    console.log('[FALLBACK] 🛍️ Generated product fallback for position', job.position, `(${brand} ${category})`);
+
+    return {
+      id: job.id,
+      type: 'product', // Critical: marks this as a product entry
+      product: {
+        id: productId,
+        name: `${color} ${category}`,
+        description: `Stylish ${color.toLowerCase()} ${category.toLowerCase()} from ${brand}`,
+        brand: {
+          name: brand,
+          logo_url: `https://ui-avatars.com/api/?name=${brand}&size=128&background=667eea&color=ffffff`
+        },
+        category: {
+          name: category,
+          slug: category.toLowerCase().replace(/\s+/g, '-')
+        },
+        base_price: basePrice,
+        sale_price: salePrice,
+        currency: 'USD',
+        mainImage: `https://picsum.photos/400/600?random=${imageId}`,
+        images: [
+          {
+            id: 1,
+            original_url: `https://picsum.photos/400/600?random=${imageId}`,
+            alt: `${brand} ${color} ${category}`
+          }
+        ],
+        variants: [
+          {
+            id: 1,
+            color: color,
+            size: sizes[productId % sizes.length],
+            current_price: basePrice,
+            sale_price: salePrice,
+            stock_quantity: 10 + (productId % 20),
+            is_available: true
+          }
+        ],
+        availableSizes: sizes,
+        availableColors: [color],
+        tags: ['trendy', 'popular', 'fallback'],
+        isOnSale: isOnSale,
+        popularity_score: 50 + (productId % 50),
+        url: `https://example.com/products/${productId}`
+      },
       timestamp: Date.now()
     };
   }
