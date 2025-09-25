@@ -53,11 +53,11 @@ export class FeedLoadingService {
   private circuitBreakerLastFailureTime = 0;
   private recentApiRequests: { timestamp: number; success: boolean }[] = [];
 
-  // Continuous Generation Configuration
-  private readonly BUFFER_TARGET = 100; // Always aim to have 100 images ready
-  private readonly GENERATION_TRIGGER_DISTANCE = 50; // Start generating when 50 images from end
-  private readonly BATCH_SIZE = 20; // Generate in batches of 20
-  private readonly CONTINUOUS_CHECK_INTERVAL = 5000; // Check every 5 seconds
+  // Continuous Generation Configuration (OPTIMIZED)
+  private readonly BUFFER_TARGET = 30; // Reduced from 100 - more reasonable buffer
+  private readonly GENERATION_TRIGGER_DISTANCE = 15; // Reduced from 50 - generate only when closer
+  private readonly BATCH_SIZE = 5; // Reduced from 20 - smaller batches
+  private readonly CONTINUOUS_CHECK_INTERVAL = 15000; // Increased from 5s to 15s - less frequent checks
 
   // Scroll prediction
   private scrollVelocity = 0;
@@ -73,7 +73,8 @@ export class FeedLoadingService {
   constructor() {
     console.log('[LOADING] 🚀 FRESH FeedLoadingService initialization with', this.MAX_WORKERS, 'parallel workers');
     this.initializeWorkers();
-    this.startContinuousGeneration();
+    // Don't start continuous generation immediately - wait for user image
+    // this.startContinuousGeneration(); // Disabled to prevent excessive initial loads
   }
 
   private initializeWorkers() {
@@ -549,13 +550,16 @@ export class FeedLoadingService {
   }
 
   /**
-   * Enable continuous background generation
+   * Enable continuous background generation (OPTIMIZED)
    */
   enableContinuousGeneration(userImageBase64: string) {
-    console.log('[LOADING] 🔄 Enabling continuous generation with 100-image buffer');
+    console.log('[LOADING] 🔄 Enabling continuous generation with 30-image buffer (optimized)');
     this.userImageBase64 = userImageBase64;
     this.continuousGenerationEnabled = true;
-    this.scheduleBackgroundGeneration();
+    // Only start if not already running
+    if (!this.backgroundGenerationTimer) {
+      this.startContinuousGeneration();
+    }
   }
 
   /**
@@ -581,16 +585,16 @@ export class FeedLoadingService {
     const distanceFromEnd = currentMaxPosition - this.lastScrollPosition;
 
     // 🚨 CRITICAL: Only generate ahead by reasonable amount
-    const reasonableAhead = this.lastScrollPosition + this.BUFFER_TARGET; // Only generate 100 positions ahead
+    const reasonableAhead = this.lastScrollPosition + this.BUFFER_TARGET; // Only generate 30 positions ahead
     const actualMaxNeeded = Math.min(this.maxGeneratedPosition, reasonableAhead);
 
     // Count actual gaps in our cache that need filling
     const gapsNeedingFill = this.countCacheGaps(this.lastScrollPosition, actualMaxNeeded);
 
     // 🚨 THROTTLE: Don't generate if queue is busy or we have enough ahead
-    const queueIsBusy = this.jobQueue.length > 20; // Reasonable queue limit
-    const hasEnoughAhead = distanceFromEnd > 20; // User has 20+ images ahead
-    const hasActiveWorkers = this.processing.size > 0;
+    const queueIsBusy = this.jobQueue.length > 10; // Reduced from 20 - stricter limit
+    const hasEnoughAhead = distanceFromEnd > 10; // Reduced from 20 - user has 10+ images ahead
+    const hasActiveWorkers = this.processing.size > 5; // Limit active workers
 
     if (queueIsBusy || (hasEnoughAhead && gapsNeedingFill < 10)) {
       console.log('[LOADING] ⏸️ Skipping buffer maintenance - sufficient content:', {
@@ -666,10 +670,10 @@ export class FeedLoadingService {
     }
 
     // Second pass: Generate ahead (lower priority, fewer jobs)
-    if (jobs.length < 5) { // Only if we don't have many critical jobs
+    if (jobs.length < 3) { // Reduced from 5 - stricter limit on critical jobs
       const currentMax = Math.max(...Array.from(this.imageCache.keys()), userPosition);
-      const aheadStart = Math.max(currentMax + 1, userPosition + 10);
-      const aheadEnd = Math.min(aheadStart + 10, scanEnd); // Much smaller ahead generation
+      const aheadStart = Math.max(currentMax + 1, userPosition + 5); // Reduced from 10
+      const aheadEnd = Math.min(aheadStart + 5, scanEnd); // Reduced from 10 - much smaller ahead generation
 
       for (let pos = aheadStart; pos <= aheadEnd; pos++) {
         if (!this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
@@ -686,7 +690,7 @@ export class FeedLoadingService {
           console.log(`[BUFFER] 📦 Queuing ahead position ${pos}`);
 
           // Limit total jobs to prevent queue overflow
-          if (jobs.length >= 15) break;
+          if (jobs.length >= 8) break; // Reduced from 15
         }
       }
     }

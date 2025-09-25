@@ -4,17 +4,28 @@ import { publicProcedure } from '../context';
 // Conditional imports - only load database services in Node.js environment
 let getDatabaseService: any, getSyncManager: any, getSupportedBrands: any;
 
-try {
-  // Only import database modules if running in Node.js (not React Native/Metro)
-  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+// Check if we're in React Native/Metro environment
+const isReactNative = typeof global !== 'undefined' && global.HermesInternal !== undefined;
+const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+const isNodeEnvironment = !isReactNative && !isBrowser && typeof process !== 'undefined' && process.versions?.node;
+
+if (isNodeEnvironment) {
+  try {
     ({ getDatabaseService, getSyncManager } = require('../../database'));
     ({ getSupportedBrands } = require('../../scraper/adapters'));
+  } catch (error) {
+    // Database modules not available, use fallbacks
   }
-} catch (error) {
-  console.warn('[CATALOG] Database modules not available in current environment:', error.message);
-  // Fallback functions for React Native environment
+}
+
+// Set up fallback functions if modules weren't loaded
+if (!getDatabaseService) {
   getDatabaseService = () => ({ getStats: () => ({ brands: {}, categories: {} }), searchProducts: () => ({ products: [], total: 0 }) });
+}
+if (!getSyncManager) {
   getSyncManager = () => ({ getStats: () => ({}), getSyncHistory: () => ([]) });
+}
+if (!getSupportedBrands) {
   getSupportedBrands = () => ['asos', 'zara', 'h&m', 'nike', 'adidas'];
 }
 

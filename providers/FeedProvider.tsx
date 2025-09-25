@@ -34,9 +34,9 @@ export interface FeedEntry {
 export type HybridFeedEntry = FeedEntry | ProductFeedEntry;
 
 // Simple mock data for immediate display using ultra-reliable URIs
-// Using reliable external image services that are compatible with React Native
-const MOCK_IMAGE_1 = 'https://picsum.photos/400/600?random=1';
-const MOCK_IMAGE_2 = 'https://picsum.photos/400/600?random=2';
+// Using specific Picsum IDs instead of random to ensure consistent availability
+const MOCK_IMAGE_1 = 'https://picsum.photos/id/1/400/600';
+const MOCK_IMAGE_2 = 'https://picsum.photos/id/2/400/600';
 
 // Fallback to simple SVG data URIs that are React Native compatible
 const FALLBACK_IMAGE_1 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzY2N2VlYSIvPjx0ZXh0IHg9IjIwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyNCI+Q2FzdWFsPC90ZXh0Pjwvc3ZnPg==';
