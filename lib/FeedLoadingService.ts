@@ -813,13 +813,26 @@ export class FeedLoadingService {
   }
 
   /**
-   * Generate outfit fallback (original behavior)
+   * Generate outfit fallback with reliable data URI images
    */
   private generateOutfitFallback(job: LoadingJob): GeneratedImage {
-    const imageId = Math.abs(job.position * 37 + 101) % 1000;
-    const imageUrl = `https://picsum.photos/400/600?random=${imageId}`;
+    // Create reliable data URI fallback images instead of picsum.photos
+    const fallbackImages = [
+      // Gradient outfit placeholder - casual style
+      'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22grad1%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%23667eea%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%23764ba2%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23grad1)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3ECasual%20Outfit%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EGenerated%20by%20AI%3C/text%3E%3C/svg%3E',
+      // Gradient outfit placeholder - business style
+      'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22grad2%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%234ecdc4%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%2344a08d%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23grad2)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EBusiness%20Look%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EGenerated%20by%20AI%3C/text%3E%3C/svg%3E',
+      // Gradient outfit placeholder - elegant style
+      'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22grad3%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%23ff7b7b%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%23d63384%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23grad3)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EEvening%20Wear%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EGenerated%20by%20AI%3C/text%3E%3C/svg%3E',
+      // Gradient outfit placeholder - trendy style
+      'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22grad4%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%23ffeaa7%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%23fab1a0%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23grad4)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3ETrendy%20Style%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EGenerated%20by%20AI%3C/text%3E%3C/svg%3E'
+    ];
 
-    console.log('[FALLBACK] 🎨 Generated outfit fallback for position', job.position);
+    // Select fallback based on position for variety
+    const fallbackIndex = job.position % fallbackImages.length;
+    const imageUrl = fallbackImages[fallbackIndex];
+
+    console.log('[FALLBACK] 🎨 Generated reliable outfit fallback for position', job.position, 'style:', fallbackIndex);
 
     return {
       id: job.id,
@@ -829,6 +842,28 @@ export class FeedLoadingService {
       cached: true,
       timestamp: Date.now()
     };
+  }
+
+  /**
+   * Generate reliable product fallback images using data URIs
+   */
+  private getProductFallbackImage(productId: number, brand: string, category: string, color: string): string {
+    // Create SVG-based product images that won't fail to load
+    const colorMap: { [key: string]: string } = {
+      'Black': '#2d3436',
+      'White': '#ddd',
+      'Navy': '#2980b9',
+      'Grey': '#636e72',
+      'Blue': '#3498db',
+      'Red': '#e74c3c',
+      'Pink': '#fd79a8',
+      'Green': '#27ae60'
+    };
+
+    const bgColor = colorMap[color] || '#74b9ff';
+    const textColor = ['White', 'Grey'].includes(color) ? '#2d3436' : '#ffffff';
+
+    return `data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22${encodeURIComponent(bgColor)}%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22240%22%20text-anchor%3D%22middle%22%20fill%3D%22${encodeURIComponent(textColor)}%22%20font-size%3D%2220%22%20font-weight%3D%22bold%22%3E${encodeURIComponent(brand)}%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22${encodeURIComponent(textColor)}%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3E${encodeURIComponent(color)}%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22${encodeURIComponent(textColor)}%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3E${encodeURIComponent(category)}%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22380%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(${textColor === '#ffffff' ? '255,255,255' : '45,52,54'},0.7)%22%20font-size%3D%2216%22%3EProduct%20%23${productId}%3C/text%3E%3C/svg%3E`;
   }
 
   /**
@@ -878,11 +913,11 @@ export class FeedLoadingService {
         base_price: basePrice,
         sale_price: salePrice,
         currency: 'USD',
-        mainImage: `https://picsum.photos/400/600?random=${imageId}`,
+        mainImage: this.getProductFallbackImage(productId, brand, category, color),
         images: [
           {
             id: 1,
-            original_url: `https://picsum.photos/400/600?random=${imageId}`,
+            original_url: this.getProductFallbackImage(productId, brand, category, color),
             alt: `${brand} ${color} ${category}`
           }
         ],

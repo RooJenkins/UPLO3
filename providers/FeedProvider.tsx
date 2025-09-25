@@ -33,20 +33,35 @@ export interface FeedEntry {
 // Union type for all feed content
 export type HybridFeedEntry = FeedEntry | ProductFeedEntry;
 
-// Simple mock data for immediate display
-// Ultra-reliable mock images using established image hosting
-// Using placeholder services that guarantee availability
-const MOCK_IMAGE_1 = 'https://picsum.photos/400/600?random=casual&blur=1';
-const MOCK_IMAGE_2 = 'https://picsum.photos/400/600?random=business&blur=2';
+// Simple mock data for immediate display using ultra-reliable data URIs
+// These will NEVER fail to load since they're embedded directly
+const MOCK_IMAGE_1 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22mockGrad1%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%23667eea%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%23764ba2%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23mockGrad1)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%20font-weight%3D%22bold%22%3ECasual%20Style%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22330%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.9)%22%20font-size%3D%2218%22%3EExample%20Outfit%20%231%3C/text%3E%3C/svg%3E';
+const MOCK_IMAGE_2 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22mockGrad2%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%234ecdc4%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%2344a08d%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23mockGrad2)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%20font-weight%3D%22bold%22%3EBusiness%20Look%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22330%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.9)%22%20font-size%3D%2218%22%3EExample%20Outfit%20%232%3C/text%3E%3C/svg%3E';
 
 // Fallback to simple data URIs if external fails
 const FALLBACK_IMAGE_1 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%23667eea%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%3ECasual%3C/text%3E%3C/svg%3E';
 const FALLBACK_IMAGE_2 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%234ecdc4%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%3EBusiness%3C/text%3E%3C/svg%3E';
 
+// Validate image URLs to prevent null/undefined from reaching React Native Image component
+const validateImageUrl = (url: string | null | undefined, fallbackUrl: string, context: string): string => {
+  if (!url || typeof url !== 'string' || url.trim().length === 0) {
+    console.warn(`[FEED] 🚨 Invalid image URL detected in ${context}, using fallback:`, url);
+    return fallbackUrl;
+  }
+
+  // Check for common invalid URL patterns that cause React Native errors
+  if (url === 'null' || url === 'undefined' || url === '') {
+    console.warn(`[FEED] 🚨 Invalid URL string detected in ${context}: "${url}", using fallback`);
+    return fallbackUrl;
+  }
+
+  return url;
+};
+
 const INITIAL_FEED: FeedEntry[] = [
   {
     id: 'mock-1-ultra-reliable',
-    imageUrl: MOCK_IMAGE_1,
+    imageUrl: validateImageUrl(MOCK_IMAGE_1, FALLBACK_IMAGE_1, 'initial mock feed entry 1'),
     prompt: 'Casual everyday outfit - placeholder',
     outfitId: 'mock-outfit-1',
     items: [
@@ -65,7 +80,7 @@ const INITIAL_FEED: FeedEntry[] = [
   },
   {
     id: 'mock-2-ultra-reliable',
-    imageUrl: MOCK_IMAGE_2,
+    imageUrl: validateImageUrl(MOCK_IMAGE_2, FALLBACK_IMAGE_2, 'initial mock feed entry 2'),
     prompt: 'Business casual outfit - placeholder',
     outfitId: 'mock-outfit-2',
     items: [
@@ -84,9 +99,9 @@ const INITIAL_FEED: FeedEntry[] = [
   },
 ];
 
-console.log('[FEED] 🎯 Initial mock feed created with ultra-reliable image URLs');
-console.log('[FEED] Mock 1 URL:', MOCK_IMAGE_1.substring(0, 50) + '...');
-console.log('[FEED] Mock 2 URL:', MOCK_IMAGE_2.substring(0, 50) + '...');
+console.log('[FEED] 🎯 Initial mock feed created with ultra-reliable data URI images');
+console.log('[FEED] Mock images are embedded data URIs - guaranteed to load');
+console.log('[FEED] ✅ Image validation system active - prevents null URL errors');
 
 export const [FeedProvider, useFeed] = createContextHook(() => {
   // Advanced loading service - force recreation for 30 workers
@@ -131,22 +146,28 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     ];
 
     if (allProducts.length > 0) {
-      const productEntries: ProductFeedEntry[] = allProducts.map((product, index) => ({
-        id: `product_${product.id}_${Date.now()}_${index}`,
-        type: 'product' as const,
-        product: {
-          ...product,
-          base_price: product.base_price || 0,
-          currency: product.currency || 'USD',
-          mainImage: product.mainImage || product.images?.[0]?.original_url || '',
-          isOnSale: product.isOnSale || false,
-          popularity_score: product.popularity_score || 0,
-          availableSizes: product.availableSizes || [],
-          availableColors: product.availableColors || [],
-          tags: product.tags || []
-        },
-        timestamp: Date.now() - index * 1000 // Spread timestamps to avoid duplicates
-      }));
+      const productEntries: ProductFeedEntry[] = allProducts.map((product, index) => {
+        // 🚨 CRITICAL: Validate product image URLs to prevent React Native errors
+        const primaryImageUrl = product.mainImage || product.images?.[0]?.original_url || '';
+        const validatedMainImage = validateImageUrl(primaryImageUrl, FALLBACK_IMAGE_2, `product ${product.id} (${product.brand?.name || 'Unknown'})`);
+
+        return {
+          id: `product_${product.id}_${Date.now()}_${index}`,
+          type: 'product' as const,
+          product: {
+            ...product,
+            base_price: product.base_price || 0,
+            currency: product.currency || 'USD',
+            mainImage: validatedMainImage,
+            isOnSale: product.isOnSale || false,
+            popularity_score: product.popularity_score || 0,
+            availableSizes: product.availableSizes || [],
+            availableColors: product.availableColors || [],
+            tags: product.tags || []
+          },
+          timestamp: Date.now() - index * 1000 // Spread timestamps to avoid duplicates
+        };
+      });
 
       // Shuffle products for variety
       const shuffledProducts = productEntries.sort(() => Math.random() - 0.5);
@@ -226,9 +247,12 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
             console.warn('[FEED] ⚠️ Skipping duplicate image at position', i, 'ID:', cachedImage.id.substring(0, 12));
             continue;
           }
+          // 🚨 CRITICAL: Validate image URL before creating feed entry to prevent React Native errors
+          const validatedImageUrl = validateImageUrl(cachedImage.imageUrl, FALLBACK_IMAGE_1, `position ${i}, cached image ${cachedImage.id.substring(0, 12)}`);
+
           const feedEntry: FeedEntry = {
             id: cachedImage.id,
-            imageUrl: cachedImage.imageUrl,
+            imageUrl: validatedImageUrl,
             prompt: cachedImage.prompt,
             outfitId: `outfit_${cachedImage.id}`,
             items: [
