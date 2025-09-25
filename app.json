@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Stylish Outfit Feed App",
-    "slug": "stylish-outfit-feed",
+    "name": "UPLO3",
+    "slug": "uplo3",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -36,7 +36,8 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "output": "server",
+      "bundler": "metro"
     },
     "plugins": [
       [
@@ -54,10 +55,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "web": {
-      "output": "server",
-      "bundler": "metro"
     }
   }
 }
