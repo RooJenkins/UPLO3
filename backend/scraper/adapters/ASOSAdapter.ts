@@ -149,7 +149,7 @@ export class ASOSAdapter extends BaseAdapter {
   /**
    * Parse ASOS's product data structure
    */
-  private parseASOSProductData(data: any): Partial<ScrapedProduct> | null {{
+  private parseASOSProductData(data: any): Partial<ScrapedProduct> | null {
     try {
       // Navigate ASOS's data structure
       const product = data.product ||

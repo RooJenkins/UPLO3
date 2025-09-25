@@ -115,6 +115,104 @@ export default function BackendTestScreen() {
     setIsLoading(false);
   };
 
+  const testCatalogEndpoints = async () => {
+    setIsLoading(true);
+    addResult('Testing catalog endpoints...');
+
+    try {
+      const baseUrl = window.location.origin;
+
+      // Test getTrendingProducts
+      addResult('Testing catalog.getTrendingProducts...');
+      const trendingUrl = `${baseUrl}/api/trpc/catalog.getTrendingProducts`;
+      const trendingResponse = await fetch(trendingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "0": {
+            "json": { "limit": 5 }
+          }
+        })
+      });
+
+      addResult(`Trending products status: ${trendingResponse.status}`);
+      if (trendingResponse.ok) {
+        const trendingData = await trendingResponse.json();
+        addResult(`Trending products: ${trendingData[0].result?.data?.data?.length || 0} items`);
+      } else {
+        const errorText = await trendingResponse.text();
+        addResult(`Trending products error: ${errorText}`);
+      }
+
+      // Test searchProducts
+      addResult('Testing catalog.searchProducts...');
+      const searchUrl = `${baseUrl}/api/trpc/catalog.searchProducts`;
+      const searchResponse = await fetch(searchUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "0": {
+            "json": {
+              "limit": 5,
+              "sortBy": "popularity",
+              "inStock": true
+            }
+          }
+        })
+      });
+
+      addResult(`Search products status: ${searchResponse.status}`);
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        addResult(`Search products: ${searchData[0].result?.data?.data?.length || 0} items`);
+      } else {
+        const errorText = await searchResponse.text();
+        addResult(`Search products error: ${errorText}`);
+      }
+
+      addResult('Catalog endpoints test completed!');
+
+    } catch (error) {
+      addResult(`Catalog endpoints error: ${error}`);
+    }
+
+    setIsLoading(false);
+  };
+
+  const testImageLoading = async () => {
+    setIsLoading(true);
+    addResult('Testing image loading...');
+
+    try {
+      // Test Picsum Photos
+      addResult('Testing Picsum Photos...');
+      const picsumUrl = 'https://picsum.photos/400/600?random=1';
+      const picsumResponse = await fetch(picsumUrl, { method: 'HEAD' });
+      addResult(`Picsum photos status: ${picsumResponse.status}`);
+
+      // Test SVG fallback
+      addResult('Testing SVG fallback...');
+      const svgFallback = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzY2N2VlYSIvPjx0ZXh0IHg9IjIwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyNCI+Q2FzdWFsPC90ZXh0Pjwvc3ZnPg==';
+
+      if (svgFallback.startsWith('data:image/svg+xml')) {
+        addResult('SVG fallback format: OK');
+      } else {
+        addResult('SVG fallback format: Invalid');
+      }
+
+      addResult('Image loading test completed!');
+
+    } catch (error) {
+      addResult(`Image loading error: ${error}`);
+    }
+
+    setIsLoading(false);
+  };
+
   const clearResults = () => {
     setTestResults([]);
   };
@@ -153,16 +251,32 @@ export default function BackendTestScreen() {
           <Text style={styles.buttonText}>Test tRPC Hi</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.button, isLoading && styles.buttonDisabled]} 
+        <TouchableOpacity
+          style={[styles.button, isLoading && styles.buttonDisabled]}
           onPress={testOutfitGenerate}
           disabled={isLoading}
         >
           <Text style={styles.buttonText}>Test Outfit Generation</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.button, styles.clearButton]} 
+        <TouchableOpacity
+          style={[styles.button, isLoading && styles.buttonDisabled]}
+          onPress={testCatalogEndpoints}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>Test Catalog Endpoints</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, isLoading && styles.buttonDisabled]}
+          onPress={testImageLoading}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>Test Image Loading</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.clearButton]}
           onPress={clearResults}
         >
           <Text style={styles.buttonText}>Clear Results</Text>

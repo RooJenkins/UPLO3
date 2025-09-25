@@ -1,7 +1,22 @@
 import { z } from 'zod';
 import { publicProcedure } from '../context';
-import { getDatabaseService, getSyncManager } from '../../database';
-import { getSupportedBrands } from '../../scraper/adapters';
+
+// Conditional imports - only load database services in Node.js environment
+let getDatabaseService: any, getSyncManager: any, getSupportedBrands: any;
+
+try {
+  // Only import database modules if running in Node.js (not React Native/Metro)
+  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+    ({ getDatabaseService, getSyncManager } = require('../../database'));
+    ({ getSupportedBrands } = require('../../scraper/adapters'));
+  }
+} catch (error) {
+  console.warn('[CATALOG] Database modules not available in current environment:', error.message);
+  // Fallback functions for React Native environment
+  getDatabaseService = () => ({ getStats: () => ({ brands: {}, categories: {} }), searchProducts: () => ({ products: [], total: 0 }) });
+  getSyncManager = () => ({ getStats: () => ({}), getSyncHistory: () => ([]) });
+  getSupportedBrands = () => ['asos', 'zara', 'h&m', 'nike', 'adidas'];
+}
 
 // Mock data for development - will be replaced with real database integration
 const MOCK_BRANDS = [

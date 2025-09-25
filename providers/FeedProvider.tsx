@@ -33,14 +33,14 @@ export interface FeedEntry {
 // Union type for all feed content
 export type HybridFeedEntry = FeedEntry | ProductFeedEntry;
 
-// Simple mock data for immediate display using ultra-reliable data URIs
-// These will NEVER fail to load since they're embedded directly
-const MOCK_IMAGE_1 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22mockGrad1%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%23667eea%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%23764ba2%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23mockGrad1)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%20font-weight%3D%22bold%22%3ECasual%20Style%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22330%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.9)%22%20font-size%3D%2218%22%3EExample%20Outfit%20%231%3C/text%3E%3C/svg%3E';
-const MOCK_IMAGE_2 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22mockGrad2%22%20x1%3D%220%25%22%20y1%3D%220%25%22%20x2%3D%22100%25%22%20y2%3D%22100%25%22%3E%3Cstop%20offset%3D%220%25%22%20style%3D%22stop-color%3A%234ecdc4%3Bstop-opacity%3A1%22%20/%3E%3Cstop%20offset%3D%22100%25%22%20style%3D%22stop-color%3A%2344a08d%3Bstop-opacity%3A1%22%20/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22url(%23mockGrad2)%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%20font-weight%3D%22bold%22%3EBusiness%20Look%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22330%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.9)%22%20font-size%3D%2218%22%3EExample%20Outfit%20%232%3C/text%3E%3C/svg%3E';
+// Simple mock data for immediate display using ultra-reliable URIs
+// Using reliable external image services that are compatible with React Native
+const MOCK_IMAGE_1 = 'https://picsum.photos/400/600?random=1';
+const MOCK_IMAGE_2 = 'https://picsum.photos/400/600?random=2';
 
-// Fallback to simple data URIs if external fails
-const FALLBACK_IMAGE_1 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%23667eea%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%3ECasual%3C/text%3E%3C/svg%3E';
-const FALLBACK_IMAGE_2 = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%234ecdc4%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%3EBusiness%3C/text%3E%3C/svg%3E';
+// Fallback to simple SVG data URIs that are React Native compatible
+const FALLBACK_IMAGE_1 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzY2N2VlYSIvPjx0ZXh0IHg9IjIwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyNCI+Q2FzdWFsPC90ZXh0Pjwvc3ZnPg==';
+const FALLBACK_IMAGE_2 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzRlY2RjNCIvPjx0ZXh0IHg9IjIwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyNCI+QnVzaW5lc3M8L3RleHQ+PC9zdmc+';
 
 // Validate image URLs to prevent null/undefined from reaching React Native Image component
 const validateImageUrl = (url: string | null | undefined, fallbackUrl: string, context: string): string => {
