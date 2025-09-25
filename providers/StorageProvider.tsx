@@ -7,7 +7,30 @@ const STORAGE_KEYS_TO_MONITOR = ['@outfit_feed_cache', '@user_favorites', '@user
 
 export const [StorageProvider, useStorage] = createContextHook(() => {
   const getStorageSize = (data: string): number => {
-    return new Blob([data]).size;
+    // React Native compatible size calculation (UTF-8 bytes)
+    try {
+      // Accurate UTF-8 byte calculation for React Native
+      let byteCount = 0;
+      for (let i = 0; i < data.length; i++) {
+        const char = data.charCodeAt(i);
+        if (char < 0x80) {
+          byteCount += 1;
+        } else if (char < 0x800) {
+          byteCount += 2;
+        } else if ((char & 0xFC00) === 0xD800) {
+          // High surrogate
+          byteCount += 4; // Surrogate pair = 4 bytes in UTF-8
+          i++; // Skip low surrogate
+        } else {
+          byteCount += 3;
+        }
+      }
+      return byteCount;
+    } catch (error) {
+      console.warn('[STORAGE] Failed to calculate size, using fallback:', error);
+      // Fallback: rough estimate (each char = 2 bytes average)
+      return data.length * 2;
+    }
   };
 
   const getTotalStorageSize = async (): Promise<number> => {
