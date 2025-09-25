@@ -31,15 +31,30 @@ export default function IndexScreen() {
   }, []); // Only run once on mount
 
   useEffect(() => {
-    // Hide splash screen after providers are loaded
+    // Hide splash screen after providers are loaded OR immediately if taking too long
     if (!isLoading || emergencyTimeoutReached) {
       const timer = setTimeout(() => {
-        SplashScreen.hideAsync();
+        SplashScreen.hideAsync().catch((error) => {
+          console.log('[INDEX] Splash hide failed (expected):', error.message);
+        });
+        console.log('[INDEX] ✅ Splash screen hidden via normal flow');
       }, 500);
 
       return () => clearTimeout(timer);
     }
   }, [isLoading, emergencyTimeoutReached]);
+
+  // Additional immediate splash screen hiding for iOS TestFlight
+  useEffect(() => {
+    const immediateTimer = setTimeout(() => {
+      SplashScreen.hideAsync().catch((error) => {
+        console.log('[INDEX] Immediate splash hide failed (expected):', error.message);
+      });
+      console.log('[INDEX] 🚨 Emergency splash screen hide activated');
+    }, 3000); // 3 seconds absolute maximum
+
+    return () => clearTimeout(immediateTimer);
+  }, []); // Run once on mount
 
   // Emergency timeout override - proceed to onboarding
   if (emergencyTimeoutReached) {
