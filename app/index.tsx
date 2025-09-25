@@ -13,7 +13,8 @@ export default function IndexScreen() {
     isOnboarded,
     hasUserImage: !!userImage,
     hasBase64: !!(userImage?.base64),
-    emergencyTimeoutReached
+    emergencyTimeoutReached,
+    timestamp: new Date().toISOString()
   });
 
   // Emergency timeout protection - critical for production builds
