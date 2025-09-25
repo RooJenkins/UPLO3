@@ -326,8 +326,9 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
 
     setCurrentIndex(newIndex);
 
-    // Update feed from cache
-    setTimeout(updateFeedFromCache, 100);
+    // 🚀 IMMEDIATE cache sync after index change
+    updateFeedFromCache(); // Immediate update
+    setTimeout(updateFeedFromCache, 50); // Very quick follow-up
   }, [service, updateFeedFromCache]);
 
   // Initialize with intelligent preloading and continuous generation
@@ -431,8 +432,10 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       service.queueJobs(jobs, userImageBase64);
     }
 
-    // Trigger buffer maintenance
-    setTimeout(updateFeedFromCache, 500);
+    // 🚀 IMMEDIATE feed update + aggressive polling
+    updateFeedFromCache(); // Immediate update
+    setTimeout(updateFeedFromCache, 100); // Quick follow-up
+    setTimeout(updateFeedFromCache, 500); // Original timing
   }, [hasInitialized, service, currentIndex, scrollVelocity, updateFeedFromCache]);
 
   // Get smart prompt based on position and user patterns
@@ -479,6 +482,16 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       });
     }
   }, [userImage, hasInitialized, initializeIntelligentFeed, triggerSmartPreload]);
+
+  // 🚀 AGGRESSIVE FEED SYNCHRONIZATION - ensures UI never lags behind cache
+  useEffect(() => {
+    const feedSyncInterval = setInterval(() => {
+      updateFeedFromCache(); // Sync every second to catch any missed updates
+      console.log('[FEED] 🔄 Aggressive cache sync triggered');
+    }, 1000);
+
+    return () => clearInterval(feedSyncInterval);
+  }, [updateFeedFromCache]);
 
   // Performance monitoring + SYSTEM HEALTH MONITORING
   useEffect(() => {
