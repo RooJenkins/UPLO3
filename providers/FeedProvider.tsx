@@ -201,7 +201,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const lastScrollTime = useRef<number>(Date.now());
   const lastScrollIndex = useRef<number>(0);
 
-  // Enhanced feed update with infinite scroll support
+  // 🚨 ULTRATHINK: Optimized feed update with efficient cache scanning
   const updateFeedFromCache = useCallback(() => {
     setFeed(currentFeed => {
       const stats = service.getCacheStats();
@@ -213,41 +213,35 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       const updatedFeed = [...currentFeed];
       let hasNewImages = false;
 
-      // Get actual cached positions to avoid duplicates
-      const cacheStats = service.getCacheStats();
-      const actualCachedPositions = [];
-      for (let pos = 2; pos < 200; pos++) { // Scan more positions
-        if (service.getImage(pos)) {
-          actualCachedPositions.push(pos);
-        }
-      }
+      // 🚨 EFFICIENT SCANNING: Only scan reasonable range around user position
+      const userPosition = currentIndex;
+      const scanStart = Math.max(2, userPosition - 5); // Don't go too far behind
+      const scanEnd = Math.min(userPosition + 50, 200); // Reasonable ahead limit
 
-      const maxAvailablePosition = actualCachedPositions.length > 0 ? Math.max(...actualCachedPositions) : 2;
-      const scanLimit = Math.max(100, maxAvailablePosition + 30); // Larger scan range for infinite scroll
+      // Track what we already have to avoid duplicate checking
+      const existingImageUrls = new Set(
+        updatedFeed
+          .filter(entry => entry && entry.imageUrl)
+          .map(entry => entry.imageUrl)
+      );
 
-      console.log('[FEED] 🔍 Cache scan:', {
-        cachedPositions: actualCachedPositions.length,
-        maxPosition: maxAvailablePosition,
-        scanLimit,
-        statsReported: cacheStats.cached
-      });
+      // Count new additions for more efficient logging
+      let newImagesAdded = 0;
+      let duplicatesSkipped = 0;
 
-      // Only add new cached images to empty positions
-      for (let i = 2; i < scanLimit; i++) { // Start after initial mock images
+      // Only scan the range we actually need
+      for (let i = scanStart; i < scanEnd; i++) {
         const cachedImage = service.getImage(i);
 
         // Only add if we don't already have an image at this position AND it's a valid cached image
         if (cachedImage && (i >= updatedFeed.length || !updatedFeed[i])) {
-          // Validate the cached image is unique
-          const isDuplicate = updatedFeed.some(entry =>
-            entry && entry.imageUrl === cachedImage.imageUrl
-          );
-
-          if (isDuplicate) {
-            console.warn('[FEED] ⚠️ Skipping duplicate image at position', i, 'ID:', cachedImage.id.substring(0, 12));
-            continue;
+          // Quick duplicate check using Set for O(1) lookup
+          if (existingImageUrls.has(cachedImage.imageUrl)) {
+            duplicatesSkipped++;
+            continue; // Skip quietly, no need to log every duplicate
           }
-          // 🚨 CRITICAL: Validate image URL before creating feed entry to prevent React Native errors
+
+          // 🚨 CRITICAL: Validate image URL before creating feed entry
           const validatedImageUrl = validateImageUrl(cachedImage.imageUrl, FALLBACK_IMAGE_1, `position ${i}, cached image ${cachedImage.id.substring(0, 12)}`);
 
           const feedEntry: FeedEntry = {
@@ -273,8 +267,21 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
             updatedFeed.push(undefined as any);
           }
           updatedFeed[i] = feedEntry;
+          existingImageUrls.add(validatedImageUrl); // Track this new URL
           hasNewImages = true;
+          newImagesAdded++;
         }
+      }
+
+      // Efficient logging - only log when there are actually changes
+      if (hasNewImages || duplicatesSkipped > 0) {
+        console.log('[FEED] 📦 Cache scan results:', {
+          scannedRange: `${scanStart}-${scanEnd}`,
+          newImagesAdded,
+          duplicatesSkipped,
+          totalFeedLength: updatedFeed.filter(Boolean).length,
+          userPosition
+        });
       }
 
       // Inject products every 3-4 positions to create a hybrid feed
@@ -307,24 +314,26 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       if (hasNewImages) {
         const filteredFeed = updatedFeed.filter(Boolean);
 
-        // Validate no duplicate images in feed
-        const imageUrls = new Set();
-        let duplicateCount = 0;
-        filteredFeed.forEach((entry, index) => {
-          if (entry && imageUrls.has(entry.imageUrl)) {
-            duplicateCount++;
-            console.warn(`[FEED] 😱 Duplicate detected at index ${index}:`, entry.id?.substring(0, 12));
-          }
-          if (entry) imageUrls.add(entry.imageUrl);
-        });
+        // More efficient duplicate validation - only check if we suspect issues
+        if (newImagesAdded > 0) {
+          const imageUrls = new Set();
+          const duplicateCount = filteredFeed.reduce((count, entry) => {
+            if (entry && imageUrls.has(entry.imageUrl)) {
+              return count + 1;
+            }
+            if (entry) imageUrls.add(entry.imageUrl);
+            return count;
+          }, 0);
 
-        console.log('[FEED] 📦 Feed updated:', {
-          totalImages: filteredFeed.length,
-          uniqueImages: imageUrls.size,
-          duplicatesRemoved: duplicateCount,
-          bufferHealth: stats.bufferHealth?.toFixed(1) + '%',
-          newImagesAdded: hasNewImages
-        });
+          // Only log final result, not every operation
+          console.log('[FEED] ✅ Feed updated:', {
+            totalImages: filteredFeed.length,
+            uniqueImages: imageUrls.size,
+            duplicatesFound: duplicateCount,
+            bufferHealth: stats.bufferHealth?.toFixed(1) + '%'
+          });
+        }
+
         return filteredFeed;
       }
       return currentFeed;
@@ -507,17 +516,16 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }
   }, [userImage, hasInitialized, initializeIntelligentFeed, triggerSmartPreload]);
 
-  // 🚀 AGGRESSIVE FEED SYNCHRONIZATION - ensures UI never lags behind cache
+  // 🚨 ULTRATHINK: Optimized feed synchronization - reduced frequency for better performance
   useEffect(() => {
     const feedSyncInterval = setInterval(() => {
-      updateFeedFromCache(); // Sync every second to catch any missed updates
-      console.log('[FEED] 🔄 Aggressive cache sync triggered');
-    }, 1000);
+      updateFeedFromCache(); // Sync every 3 seconds - much more reasonable
+    }, 3000); // Reduced from 1000ms to 3000ms
 
     return () => clearInterval(feedSyncInterval);
   }, [updateFeedFromCache]);
 
-  // Performance monitoring + SYSTEM HEALTH MONITORING
+  // 🚨 ULTRATHINK: Optimized monitoring - reduced frequency and conditional logging
   useEffect(() => {
     const monitoringInterval = setInterval(() => {
       const stats = service.getCacheStats();
@@ -525,10 +533,11 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       setLoadingStats(stats);
       setSystemHealth(health);
 
-      if (stats.efficiency > 0.8) {
-        console.log('[FEED] ⚡ High efficiency:', (stats.efficiency * 100).toFixed(1) + '%');
+      // Only log efficiency when it's exceptional (not every time it's high)
+      if (stats.efficiency === 1.0 && Date.now() % 10000 < 5000) { // Log max efficiency occasionally
+        console.log('[FEED] ⚡ Peak efficiency:', (stats.efficiency * 100).toFixed(1) + '%');
       }
-    }, 2000);
+    }, 5000); // Reduced from 2000ms to 5000ms
 
     return () => clearInterval(monitoringInterval);
   }, [service]);

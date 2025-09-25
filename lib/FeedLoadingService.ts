@@ -210,16 +210,23 @@ export class FeedLoadingService {
 
       const result = await this.generateImage(job);
 
-      // Cache the result with validation to prevent duplicates
+      // 🚨 ULTRATHINK: Atomic position check and cache to prevent race conditions
       if (this.imageCache.has(job.position)) {
-        console.warn('[WORKER] ⚠️ Position already cached, potential duplicate:', {
+        const existingImage = this.imageCache.get(job.position)!;
+        console.warn('[WORKER] ⚠️ Position already cached by another worker, discarding duplicate:', {
           workerId,
           position: job.position,
-          existingId: this.imageCache.get(job.position)?.id,
-          newId: result.id
+          existingId: existingImage.id.substring(0, 12),
+          newId: result.id.substring(0, 12),
+          existingTimestamp: existingImage.timestamp,
+          newTimestamp: result.timestamp
         });
+
+        // Don't overwrite - first worker wins
+        return;
       }
 
+      // Cache the result only if position is still free
       this.imageCache.set(job.position, result);
       console.log('[WORKER] ✅ Cached image at position', job.position, 'ID:', result.id.substring(0, 12));
 
@@ -567,27 +574,45 @@ export class FeedLoadingService {
   }
 
   /**
-   * Maintain the 100-image buffer continuously
+   * 🚨 ULTRATHINK: Fixed buffer maintenance with intelligent position management
    */
   private maintainBuffer() {
     const currentMaxPosition = Math.max(...Array.from(this.imageCache.keys()), 0);
     const distanceFromEnd = currentMaxPosition - this.lastScrollPosition;
 
-    // Update max generated position
-    this.maxGeneratedPosition = Math.max(this.maxGeneratedPosition, currentMaxPosition);
+    // 🚨 CRITICAL: Only generate ahead by reasonable amount
+    const reasonableAhead = this.lastScrollPosition + this.BUFFER_TARGET; // Only generate 100 positions ahead
+    const actualMaxNeeded = Math.min(this.maxGeneratedPosition, reasonableAhead);
 
-    const needsMoreImages = (
-      distanceFromEnd <= this.GENERATION_TRIGGER_DISTANCE || // User approaching end
-      this.imageCache.size < this.BUFFER_TARGET || // Buffer not full
-      this.jobQueue.length === 0 // No jobs queued
-    );
+    // Count actual gaps in our cache that need filling
+    const gapsNeedingFill = this.countCacheGaps(this.lastScrollPosition, actualMaxNeeded);
 
-    if (needsMoreImages) {
-      console.log('[LOADING] 🚀 Buffer maintenance triggered:', {
+    // 🚨 THROTTLE: Don't generate if queue is busy or we have enough ahead
+    const queueIsBusy = this.jobQueue.length > 20; // Reasonable queue limit
+    const hasEnoughAhead = distanceFromEnd > 20; // User has 20+ images ahead
+    const hasActiveWorkers = this.processing.size > 0;
+
+    if (queueIsBusy || (hasEnoughAhead && gapsNeedingFill < 10)) {
+      console.log('[LOADING] ⏸️ Skipping buffer maintenance - sufficient content:', {
+        distanceFromEnd,
+        queueLength: this.jobQueue.length,
+        gapsNeedingFill,
+        reasonableAhead,
+        hasEnoughAhead,
+        queueIsBusy
+      });
+      return;
+    }
+
+    // Only generate if we actually need more images
+    if (gapsNeedingFill > 0 || distanceFromEnd <= this.GENERATION_TRIGGER_DISTANCE) {
+      console.log('[LOADING] 🚀 Buffer maintenance triggered (controlled):', {
         distanceFromEnd,
         bufferSize: this.imageCache.size,
         queueLength: this.jobQueue.length,
-        userPosition: this.lastScrollPosition
+        userPosition: this.lastScrollPosition,
+        gapsNeedingFill,
+        actualMaxNeeded
       });
 
       this.generateBufferBatch();
@@ -595,41 +620,95 @@ export class FeedLoadingService {
   }
 
   /**
-   * Generate a batch of images for the buffer with duplicate prevention
+   * Count how many positions between start and end are missing from cache
+   */
+  private countCacheGaps(startPos: number, endPos: number): number {
+    let gaps = 0;
+    for (let pos = startPos; pos <= endPos; pos++) {
+      if (!this.imageCache.has(pos)) {
+        gaps++;
+      }
+    }
+    return gaps;
+  }
+
+  /**
+   * 🚨 ULTRATHINK: Fixed buffer batch generation with intelligent gap-filling
    */
   private generateBufferBatch() {
     if (!this.userImageBase64) return;
 
     const jobs = [];
-    const startPosition = this.maxGeneratedPosition + 1;
 
-    for (let i = 0; i < this.BATCH_SIZE; i++) {
-      const position = startPosition + i;
+    // 🚨 PRIORITY: Fill gaps near user first, then generate ahead
+    const userPosition = this.lastScrollPosition;
+    const scanStart = Math.max(0, userPosition - 5); // Check behind user too
+    const scanEnd = userPosition + this.BUFFER_TARGET; // Reasonable ahead limit
 
-      if (!this.imageCache.has(position)) {
-        const uniqueId = `buffer_${position}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        const prompt = this.getPromptForPosition(position);
+    // First pass: Fill critical gaps near user (high priority)
+    for (let pos = scanStart; pos <= userPosition + 20; pos++) {
+      if (!this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
+        const uniqueId = `critical_gap_${pos}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const prompt = this.getPromptForPosition(pos);
 
         jobs.push({
           id: uniqueId,
           prompt,
-          priority: 'cache' as const,
-          position
+          priority: 'critical' as const,
+          position: pos
         });
 
-        console.log(`[BUFFER] 📦 Queuing position ${position} with unique ID: ${uniqueId.substring(0, 20)}...`);
-      } else {
-        console.log(`[BUFFER] ⏭️ Skipping position ${position} - already cached`);
+        console.log(`[BUFFER] 🚨 Queuing critical gap at position ${pos}`);
+
+        // Limit critical jobs to prevent overflow
+        if (jobs.length >= 10) break;
+      }
+    }
+
+    // Second pass: Generate ahead (lower priority, fewer jobs)
+    if (jobs.length < 5) { // Only if we don't have many critical jobs
+      const currentMax = Math.max(...Array.from(this.imageCache.keys()), userPosition);
+      const aheadStart = Math.max(currentMax + 1, userPosition + 10);
+      const aheadEnd = Math.min(aheadStart + 10, scanEnd); // Much smaller ahead generation
+
+      for (let pos = aheadStart; pos <= aheadEnd; pos++) {
+        if (!this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
+          const uniqueId = `buffer_ahead_${pos}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          const prompt = this.getPromptForPosition(pos);
+
+          jobs.push({
+            id: uniqueId,
+            prompt,
+            priority: 'cache' as const,
+            position: pos
+          });
+
+          console.log(`[BUFFER] 📦 Queuing ahead position ${pos}`);
+
+          // Limit total jobs to prevent queue overflow
+          if (jobs.length >= 15) break;
+        }
       }
     }
 
     if (jobs.length > 0) {
-      console.log('[LOADING] 🚀 Generating buffer batch:', jobs.length, 'unique images from position', startPosition);
+      console.log('[LOADING] 🚀 Generating controlled buffer batch:', jobs.length, 'images (gaps + ahead)');
       this.queueJobs(jobs, this.userImageBase64);
-      this.maxGeneratedPosition = startPosition + this.BATCH_SIZE - 1;
+
+      // Update maxGenerated more conservatively
+      const maxJobPosition = Math.max(...jobs.map(j => j.position));
+      this.maxGeneratedPosition = Math.max(this.maxGeneratedPosition, maxJobPosition);
     } else {
-      console.log('[BUFFER] ✅ All positions already cached, no new jobs needed');
+      console.log('[BUFFER] ✅ No gaps found, buffer is sufficient');
     }
+  }
+
+  /**
+   * Check if a position is already being processed in the job queue
+   */
+  private isPositionInQueue(position: number): boolean {
+    return this.jobQueue.some(job => job.position === position) ||
+           Array.from(this.processing.values()).some(job => job.position === position);
   }
 
   /**
