@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFeed, FeedEntry } from '@/providers/FeedProvider';
+import { useFeed, FeedEntry, HybridFeedEntry } from '@/providers/FeedProvider';
 import { useUser } from '@/providers/UserProvider';
 import { FeedCard } from '@/components/FeedCard';
+import { ProductFeedCard, ProductFeedEntry } from '@/components/ProductFeedCard';
 import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { LoadingCard } from '@/components/LoadingCard';
 import { TrpcStatus } from '@/components/TrpcStatus';
@@ -34,6 +35,7 @@ export default function FeedScreen() {
     preloadedUrls,
     cloudSyncStatus,
     loadingStats,
+    systemHealth, // 🚨 EMERGENCY SYSTEM HEALTH DATA
     scrollVelocity,
     workerStats,
     // Continuous generation properties
@@ -86,7 +88,14 @@ export default function FeedScreen() {
     if (item.isGenerating) {
       return <LoadingCard />;
     }
-    return <FeedCard entry={item} isActive={index === currentIndex} />;
+
+    // Handle different types of feed entries
+    if (item.type === 'product') {
+      return <ProductFeedCard entry={item as ProductFeedEntry} isActive={index === currentIndex} />;
+    } else {
+      // Default to outfit/AI-generated content
+      return <FeedCard entry={item as FeedEntry} isActive={index === currentIndex} />;
+    }
   };
 
   const getItemLayout = (_: any, index: number) => ({
@@ -139,10 +148,11 @@ export default function FeedScreen() {
           </View>
         </View>
 
-        {/* Advanced Loading Stats */}
+        {/* Advanced Loading Stats + SYSTEM HEALTH */}
         {loadingStats && (
           <LoadingStats
             stats={loadingStats}
+            systemHealth={systemHealth} // 🚨 EMERGENCY MONITORING
             scrollVelocity={scrollVelocity || 0}
             style={styles.loadingStats}
           />

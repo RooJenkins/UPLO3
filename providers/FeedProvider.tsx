@@ -3,6 +3,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { FeedLoadingService, GeneratedImage } from '@/lib/FeedLoadingService';
 import { useUser } from '@/providers/UserProvider';
+import { ProductFeedEntry } from '@/components/ProductFeedCard';
 
 export interface OutfitItem {
   id: string;
@@ -26,7 +27,11 @@ export interface FeedEntry {
     colors: string[];
   };
   timestamp: number;
+  type?: 'outfit'; // Default type for AI outfits
 }
+
+// Union type for all feed content
+export type HybridFeedEntry = FeedEntry | ProductFeedEntry;
 
 // Simple mock data for immediate display
 // Ultra-reliable mock images using established image hosting
@@ -95,11 +100,80 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   // Get user image from UserProvider
   const { userImage } = useUser();
 
-  // State management
-  const [feed, setFeed] = useState<FeedEntry[]>(INITIAL_FEED);
+  // State management - hybrid feed with both outfits and products
+  const [feed, setFeed] = useState<HybridFeedEntry[]>(INITIAL_FEED);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [productFeed, setProductFeed] = useState<ProductFeedEntry[]>([]);
+  const [nextProductIndex, setNextProductIndex] = useState(0);
+
+  // tRPC hooks for catalog integration
+  const { data: trendingProducts, refetch: refetchTrending } = trpc.catalog.getTrendingProducts.useQuery({
+    limit: 20 // Get more products to mix into feed
+  }, {
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    staleTime: 2 * 60 * 1000 // Consider stale after 2 minutes
+  });
+
+  const { data: searchProducts, refetch: refetchProducts } = trpc.catalog.searchProducts.useQuery({
+    limit: 30,
+    sortBy: 'popularity',
+    inStock: true
+  }, {
+    refetchInterval: 10 * 60 * 1000, // Refetch every 10 minutes
+    staleTime: 5 * 60 * 1000 // Consider stale after 5 minutes
+  });
+
+  // Transform catalog products into product feed entries
+  useEffect(() => {
+    const allProducts = [
+      ...(trendingProducts?.data || []),
+      ...(searchProducts?.data || [])
+    ];
+
+    if (allProducts.length > 0) {
+      const productEntries: ProductFeedEntry[] = allProducts.map((product, index) => ({
+        id: `product_${product.id}_${Date.now()}_${index}`,
+        type: 'product' as const,
+        product: {
+          ...product,
+          base_price: product.base_price || 0,
+          currency: product.currency || 'USD',
+          mainImage: product.mainImage || product.images?.[0]?.original_url || '',
+          isOnSale: product.isOnSale || false,
+          popularity_score: product.popularity_score || 0,
+          availableSizes: product.availableSizes || [],
+          availableColors: product.availableColors || [],
+          tags: product.tags || []
+        },
+        timestamp: Date.now() - index * 1000 // Spread timestamps to avoid duplicates
+      }));
+
+      // Shuffle products for variety
+      const shuffledProducts = productEntries.sort(() => Math.random() - 0.5);
+      setProductFeed(shuffledProducts);
+
+      console.log('[FEED] 🛍️ Loaded', shuffledProducts.length, 'products into feed');
+    }
+  }, [trendingProducts, searchProducts]);
+
+  // Function to get next product to inject into feed
+  const getNextProduct = useCallback((): ProductFeedEntry | null => {
+    if (productFeed.length === 0) return null;
+
+    const product = productFeed[nextProductIndex % productFeed.length];
+    setNextProductIndex(prev => prev + 1);
+
+    // Create a unique instance to avoid React key collisions
+    return {
+      ...product,
+      id: `product_instance_${product.product.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      timestamp: Date.now()
+    };
+  }, [productFeed, nextProductIndex]);
+
   const [hasInitialized, setHasInitialized] = useState(false);
   const [loadingStats, setLoadingStats] = useState<any>({});
+  const [systemHealth, setSystemHealth] = useState<any>({});
   const [scrollVelocity, setScrollVelocity] = useState(0);
 
   // Scroll tracking for intelligent preloading
@@ -110,7 +184,9 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
   const updateFeedFromCache = useCallback(() => {
     setFeed(currentFeed => {
       const stats = service.getCacheStats();
+      const health = service.getSystemHealth();
       setLoadingStats(stats);
+      setSystemHealth(health);
 
       // Start with existing feed - NEVER replace existing entries
       const updatedFeed = [...currentFeed];
@@ -177,6 +253,32 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
         }
       }
 
+      // Inject products every 3-4 positions to create a hybrid feed
+      const shouldInjectProducts = productFeed.length > 0 && updatedFeed.length >= 4;
+      if (shouldInjectProducts) {
+        // Calculate product injection positions (every 3-4 items)
+        const productPositions = [];
+        for (let pos = 4; pos < scanLimit; pos += (3 + Math.floor(Math.random() * 2))) { // 3-4 positions apart
+          productPositions.push(pos);
+        }
+
+        productPositions.forEach(position => {
+          // Only inject if position is empty or near the end of current feed
+          if (position >= updatedFeed.length || !updatedFeed[position]) {
+            const productEntry = getNextProduct();
+            if (productEntry) {
+              // Extend array if needed
+              while (updatedFeed.length <= position) {
+                updatedFeed.push(undefined as any);
+              }
+              updatedFeed[position] = productEntry;
+              hasNewImages = true;
+              console.log('[FEED] 🛍️ Injected product at position', position, productEntry.product.brand.name, productEntry.product.name);
+            }
+          }
+        });
+      }
+
       // Only return new array if we actually added images (prevents unnecessary re-renders)
       if (hasNewImages) {
         const filteredFeed = updatedFeed.filter(Boolean);
@@ -203,7 +305,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       }
       return currentFeed;
     });
-  }, [service]);
+  }, [service, getNextProduct, productFeed.length]);
 
   // Enhanced scroll tracking with velocity calculation
   const updateScrollPosition = useCallback((newIndex: number) => {
@@ -378,11 +480,13 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     }
   }, [userImage, hasInitialized, initializeIntelligentFeed, triggerSmartPreload]);
 
-  // Performance monitoring
+  // Performance monitoring + SYSTEM HEALTH MONITORING
   useEffect(() => {
     const monitoringInterval = setInterval(() => {
       const stats = service.getCacheStats();
+      const health = service.getSystemHealth();
       setLoadingStats(stats);
+      setSystemHealth(health);
 
       if (stats.efficiency > 0.8) {
         console.log('[FEED] ⚡ High efficiency:', (stats.efficiency * 100).toFixed(1) + '%');
@@ -412,6 +516,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     },
     // Advanced features with continuous generation
     loadingStats,
+    systemHealth, // 🚨 EMERGENCY SYSTEM HEALTH DATA
     scrollVelocity,
     workerStats: service.getWorkerStats(),
 

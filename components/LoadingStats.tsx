@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Cpu, Zap, Database, Gauge, Target, RotateCw } from 'lucide-react-native';
+import { Cpu, Zap, Database, Gauge, Target, RotateCw, Shield, AlertTriangle } from 'lucide-react-native';
 
 interface LoadingStatsProps {
   stats: {
@@ -17,13 +17,28 @@ interface LoadingStatsProps {
   };
   scrollVelocity: number;
   style?: any;
+  systemHealth?: {
+    circuitBreakerState: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+    queueSize: number;
+    maxQueueSize: number;
+    queueHealth: string;
+    apiFailureRate: string;
+    recentRequests: number;
+    recentFailures: number;
+  };
 }
 
-export function LoadingStats({ stats, scrollVelocity, style }: LoadingStatsProps) {
+export function LoadingStats({ stats, scrollVelocity, style, systemHealth }: LoadingStatsProps) {
   const efficiencyColor = stats.efficiency > 0.8 ? '#4ECDC4' : stats.efficiency > 0.5 ? '#FFB347' : '#FF6B6B';
   const velocityColor = Math.abs(scrollVelocity) > 2 ? '#4ECDC4' : '#9CA3AF';
   const bufferHealthColor = (stats.bufferHealth || 0) > 80 ? '#4ECDC4' : (stats.bufferHealth || 0) > 50 ? '#FFB347' : '#FF6B6B';
   const distanceColor = (stats.distanceFromEnd || 0) < 10 ? '#FF6B6B' : (stats.distanceFromEnd || 0) < 30 ? '#FFB347' : '#4ECDC4';
+
+  // 🚨 SYSTEM HEALTH COLORS
+  const circuitBreakerColor = systemHealth?.circuitBreakerState === 'OPEN' ? '#FF6B6B' :
+                             systemHealth?.circuitBreakerState === 'HALF_OPEN' ? '#FFB347' : '#4ECDC4';
+  const queueHealthColor = parseFloat(systemHealth?.queueHealth || '100') > 80 ? '#4ECDC4' :
+                          parseFloat(systemHealth?.queueHealth || '100') > 50 ? '#FFB347' : '#FF6B6B';
 
   return (
     <View style={[styles.container, style]}>
@@ -76,10 +91,51 @@ export function LoadingStats({ stats, scrollVelocity, style }: LoadingStatsProps
         </View>
       )}
 
+      {/* 🚨 EMERGENCY SYSTEM STATUS */}
+      {systemHealth && (
+        <>
+          {/* Circuit Breaker Status */}
+          <View style={styles.statRow}>
+            {systemHealth.circuitBreakerState === 'OPEN' ? (
+              <AlertTriangle size={14} color={circuitBreakerColor} />
+            ) : (
+              <Shield size={14} color={circuitBreakerColor} />
+            )}
+            <Text style={styles.statLabel}>API</Text>
+            <Text style={[styles.statValue, { color: circuitBreakerColor }]}>
+              {systemHealth.circuitBreakerState === 'OPEN' ? 'DOWN' :
+               systemHealth.circuitBreakerState === 'HALF_OPEN' ? 'TEST' : 'OK'}
+            </Text>
+          </View>
+
+          {/* Queue Health */}
+          <View style={styles.statRow}>
+            <Gauge size={14} color={queueHealthColor} />
+            <Text style={styles.statLabel}>Queue</Text>
+            <Text style={[styles.statValue, { color: queueHealthColor }]}>
+              {systemHealth.queueHealth}
+            </Text>
+          </View>
+
+          {/* API Failure Rate */}
+          {parseFloat(systemHealth.apiFailureRate) > 0 && (
+            <View style={styles.statRow}>
+              <Text style={[styles.queueIndicator, {
+                color: parseFloat(systemHealth.apiFailureRate) > 50 ? '#FF6B6B' : '#FFB347'
+              }]}>
+                Fail: {systemHealth.apiFailureRate}
+              </Text>
+            </View>
+          )}
+        </>
+      )}
+
       {/* Queue Length */}
       {stats.queueLength > 0 && (
         <View style={styles.statRow}>
-          <Text style={styles.queueIndicator}>
+          <Text style={[styles.queueIndicator, {
+            color: stats.queueLength > 25 ? '#FF6B6B' : '#FFB347'
+          }]}>
             Q:{stats.queueLength}
           </Text>
         </View>

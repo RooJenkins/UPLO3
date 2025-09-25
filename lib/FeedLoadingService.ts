@@ -39,8 +39,19 @@ export class FeedLoadingService {
   private readonly MAX_WORKERS = 30;
   private readonly PRELOAD_AHEAD = 20;
   private readonly CACHE_BEHIND = 10;
-  private readonly MAX_RETRIES = 2;
+  private readonly MAX_RETRIES = 3;
   private readonly CACHE_SIZE_LIMIT = 100; // Total images to keep in memory (increased for better UX)
+
+  // 🚨 EMERGENCY SYSTEM PROTECTION
+  private readonly EMERGENCY_MAX_QUEUE_SIZE = 50; // HARD LIMIT - prevents overflow
+  private readonly CIRCUIT_BREAKER_FAILURE_THRESHOLD = 0.7; // 70% failure rate triggers circuit breaker
+  private readonly CIRCUIT_BREAKER_TIMEOUT = 30000; // 30 seconds before retry
+  private readonly CIRCUIT_BREAKER_MIN_REQUESTS = 10; // Minimum requests to calculate failure rate
+
+  // Circuit Breaker State
+  private circuitBreakerState: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+  private circuitBreakerLastFailureTime = 0;
+  private recentApiRequests: { timestamp: number; success: boolean }[] = [];
 
   // Continuous Generation Configuration
   private readonly BUFFER_TARGET = 100; // Always aim to have 100 images ready
@@ -94,9 +105,29 @@ export class FeedLoadingService {
   }
 
   /**
-   * Add jobs to queue with priority system
+   * Add jobs to queue with priority system + EMERGENCY OVERFLOW PROTECTION
    */
   queueJobs(jobs: Omit<LoadingJob, 'retries' | 'timestamp'>[], userImageBase64: string) {
+    // 🚨 EMERGENCY QUEUE SIZE PROTECTION
+    if (this.jobQueue.length >= this.EMERGENCY_MAX_QUEUE_SIZE) {
+      console.warn('[LOADING] 🚨 EMERGENCY: Queue overflow detected!', {
+        currentSize: this.jobQueue.length,
+        maxSize: this.EMERGENCY_MAX_QUEUE_SIZE,
+        newJobs: jobs.length
+      });
+
+      // Emergency cleanup - keep only critical jobs
+      this.emergencyQueueCleanup();
+
+      // Only accept critical jobs during overflow
+      jobs = jobs.filter(job => job.priority === 'critical');
+
+      if (jobs.length === 0) {
+        console.warn('[LOADING] 🚫 Rejecting non-critical jobs during queue overflow');
+        return;
+      }
+    }
+
     const newJobs: LoadingJob[] = jobs.map(job => ({
       ...job,
       userImageBase64,
@@ -207,11 +238,28 @@ export class FeedLoadingService {
 
       stats.errors++;
 
-      // Retry logic
-      if (job.retries < this.MAX_RETRIES) {
+      // 🚨 ENHANCED RETRY LOGIC with EXPONENTIAL BACKOFF
+      if (job.retries < this.MAX_RETRIES && this.circuitBreakerState !== 'OPEN') {
         job.retries++;
-        this.jobQueue.unshift(job); // Re-queue with higher priority
-        console.log(`[WORKER-${workerId}] Retrying job ${job.id} (attempt ${job.retries + 1})`);
+
+        // Exponential backoff delay: 1s, 2s, 4s, 8s...
+        const backoffDelay = Math.min(1000 * Math.pow(2, job.retries - 1), 10000);
+
+        setTimeout(() => {
+          this.jobQueue.unshift(job); // Re-queue with higher priority
+          console.log(`[WORKER-${workerId}] Retrying job ${job.id} (attempt ${job.retries + 1}) after ${backoffDelay}ms delay`);
+        }, backoffDelay);
+      } else if (this.circuitBreakerState === 'OPEN') {
+        // Generate fallback image when circuit breaker is open
+        try {
+          const fallbackResult = await this.generateFallbackImage(job);
+          this.imageCache.set(job.position, fallbackResult);
+          console.log(`[WORKER-${workerId}] Generated fallback for position ${job.position} due to circuit breaker`);
+        } catch (fallbackError) {
+          console.error(`[WORKER-${workerId}] Failed to generate fallback:`, fallbackError);
+        }
+      } else {
+        console.error(`[WORKER-${workerId}] Max retries exceeded for job ${job.id}`);
       }
     } finally {
       stats.busy = false;
@@ -231,36 +279,70 @@ export class FeedLoadingService {
   }
 
   /**
-   * Generate image using Rork Toolkit API
+   * Generate image using Rork Toolkit API + CIRCUIT BREAKER PROTECTION
    */
   private async generateImage(job: LoadingJob): Promise<GeneratedImage> {
-    const response = await fetch('https://toolkit.rork.com/images/edit/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: `Change the person's outfit to: ${job.prompt}. Keep the person's face and pose. Full body.`,
-        images: [{ type: 'image', image: job.userImageBase64 }],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API failed: ${response.status} ${response.statusText}`);
+    // 🚨 CIRCUIT BREAKER CHECK
+    if (this.circuitBreakerState === 'OPEN') {
+      // Check if we can retry
+      if (Date.now() - this.circuitBreakerLastFailureTime > this.CIRCUIT_BREAKER_TIMEOUT) {
+        this.circuitBreakerState = 'HALF_OPEN';
+        console.log('[CIRCUIT-BREAKER] 🔄 Switching to HALF_OPEN - testing API');
+      } else {
+        console.warn('[CIRCUIT-BREAKER] 🚫 API blocked - using graceful fallback');
+        return this.generateFallbackImage(job);
+      }
     }
 
-    const data = await response.json();
-    const image = data?.image;
-    const imageUrl = image?.base64Data && image?.mimeType
-      ? `data:${image.mimeType};base64,${image.base64Data}`
-      : `https://via.placeholder.com/400x600/FF6B6B/FFFFFF?text=${encodeURIComponent('Fallback')}`;
+    const startTime = Date.now();
 
-    return {
-      id: job.id,
-      imageUrl,
-      prompt: job.prompt,
-      position: job.position,
-      cached: true,
-      timestamp: Date.now()
-    };
+    try {
+      const response = await fetch('https://toolkit.rork.com/images/edit/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Change the person's outfit to: ${job.prompt}. Keep the person's face and pose. Full body.`,
+          images: [{ type: 'image', image: job.userImageBase64 }],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const image = data?.image;
+      const imageUrl = image?.base64Data && image?.mimeType
+        ? `data:${image.mimeType};base64,${image.base64Data}`
+        : `https://via.placeholder.com/400x600/FF6B6B/FFFFFF?text=${encodeURIComponent('Fallback')}`;
+
+      // Record successful API call
+      this.recordApiRequest(true);
+
+      // If we were in HALF_OPEN, switch back to CLOSED
+      if (this.circuitBreakerState === 'HALF_OPEN') {
+        this.circuitBreakerState = 'CLOSED';
+        console.log('[CIRCUIT-BREAKER] ✅ Switched to CLOSED - API recovered');
+      }
+
+      return {
+        id: job.id,
+        imageUrl,
+        prompt: job.prompt,
+        position: job.position,
+        cached: true,
+        timestamp: Date.now()
+      };
+
+    } catch (error) {
+      // Record failed API call
+      this.recordApiRequest(false);
+
+      // Check if we should open the circuit breaker
+      this.evaluateCircuitBreaker();
+
+      throw error; // Re-throw for retry logic
+    }
   }
 
   /**
@@ -618,6 +700,116 @@ export class FeedLoadingService {
       // Debug info
       cacheKeys: Array.from(this.imageCache.keys()),
       processingIds: Array.from(this.processing.keys())
+    };
+  }
+
+  // ========================================
+  // 🚨 EMERGENCY SYSTEM PROTECTION METHODS
+  // ========================================
+
+  /**
+   * Emergency queue cleanup - removes non-critical jobs when overflowing
+   */
+  private emergencyQueueCleanup() {
+    const originalSize = this.jobQueue.length;
+
+    // Keep only critical jobs
+    this.jobQueue = this.jobQueue.filter(job => job.priority === 'critical');
+
+    // If still too many, keep only the most recent critical jobs
+    if (this.jobQueue.length > this.EMERGENCY_MAX_QUEUE_SIZE / 2) {
+      this.jobQueue = this.jobQueue
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, Math.floor(this.EMERGENCY_MAX_QUEUE_SIZE / 2));
+    }
+
+    const removedJobs = originalSize - this.jobQueue.length;
+    console.warn('[EMERGENCY] 🧹 Cleaned queue:', {
+      originalSize,
+      newSize: this.jobQueue.length,
+      removedJobs
+    });
+  }
+
+  /**
+   * Record API request result for circuit breaker evaluation
+   */
+  private recordApiRequest(success: boolean) {
+    const now = Date.now();
+
+    // Add the new request
+    this.recentApiRequests.push({ timestamp: now, success });
+
+    // Remove old requests (keep last 5 minutes)
+    this.recentApiRequests = this.recentApiRequests.filter(
+      req => now - req.timestamp < 300000 // 5 minutes
+    );
+  }
+
+  /**
+   * Evaluate if circuit breaker should be opened
+   */
+  private evaluateCircuitBreaker() {
+    if (this.recentApiRequests.length < this.CIRCUIT_BREAKER_MIN_REQUESTS) {
+      return; // Not enough data
+    }
+
+    const failures = this.recentApiRequests.filter(req => !req.success).length;
+    const failureRate = failures / this.recentApiRequests.length;
+
+    if (failureRate >= this.CIRCUIT_BREAKER_FAILURE_THRESHOLD) {
+      this.circuitBreakerState = 'OPEN';
+      this.circuitBreakerLastFailureTime = Date.now();
+
+      console.error('[CIRCUIT-BREAKER] 🚨 OPENED - API failure rate:', {
+        failureRate: `${(failureRate * 100).toFixed(1)}%`,
+        failures,
+        total: this.recentApiRequests.length,
+        threshold: `${(this.CIRCUIT_BREAKER_FAILURE_THRESHOLD * 100).toFixed(1)}%`
+      });
+
+      // Emergency queue cleanup when circuit breaker opens
+      this.emergencyQueueCleanup();
+    }
+  }
+
+  /**
+   * Generate fallback image when API is unavailable
+   */
+  private generateFallbackImage(job: LoadingJob): GeneratedImage {
+    // Generate a unique fallback image with Picsum
+    const imageId = Math.abs(job.position * 37 + 101) % 1000;
+    const imageUrl = `https://picsum.photos/400/600?random=${imageId}`;
+
+    console.log('[FALLBACK] 🎨 Generated fallback image for position', job.position);
+
+    return {
+      id: job.id,
+      imageUrl,
+      prompt: job.prompt,
+      position: job.position,
+      cached: true,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Get circuit breaker status for debugging
+   */
+  getSystemHealth() {
+    const recentRequests = this.recentApiRequests.length;
+    const recentFailures = this.recentApiRequests.filter(req => !req.success).length;
+    const failureRate = recentRequests > 0 ? (recentFailures / recentRequests) : 0;
+
+    return {
+      circuitBreakerState: this.circuitBreakerState,
+      queueSize: this.jobQueue.length,
+      maxQueueSize: this.EMERGENCY_MAX_QUEUE_SIZE,
+      queueHealth: `${((1 - (this.jobQueue.length / this.EMERGENCY_MAX_QUEUE_SIZE)) * 100).toFixed(1)}%`,
+      apiFailureRate: `${(failureRate * 100).toFixed(1)}%`,
+      recentRequests,
+      recentFailures,
+      lastFailureTime: this.circuitBreakerLastFailureTime ? new Date(this.circuitBreakerLastFailureTime).toISOString() : null
     };
   }
 }
