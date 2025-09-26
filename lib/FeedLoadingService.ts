@@ -1,4 +1,6 @@
 import { Image } from 'react-native';
+import { VirtualTryOnService, type Product, type VirtualTryOnResult } from './VirtualTryOnService';
+import { RecommendationEngine, type UserProfile, type RecommendationContext, type RecommendationResult } from './RecommendationEngine';
 
 export interface LoadingJob {
   id: string;
@@ -17,6 +19,10 @@ export interface GeneratedImage {
   position: number;
   cached: boolean;
   timestamp: number;
+  // Enhanced with real product data
+  product?: Product;
+  virtualTryOnResult?: VirtualTryOnResult;
+  type: 'outfit' | 'product';
 }
 
 export interface WorkerStats {
@@ -37,6 +43,15 @@ export class FeedLoadingService {
   private imageCache: Map<number, GeneratedImage> = new Map();
   private preloadedImages: Set<string> = new Set();
   private workerStats: Map<string, WorkerStats> = new Map();
+
+  // 🚨 NEW: Virtual Try-On Service Integration
+  private virtualTryOnService: VirtualTryOnService;
+  private productCache: Map<string, Product[]> = new Map();
+  private availableProducts: Product[] = [];
+
+  // 🚨 ULTRATHINK: Smart Recommendation Engine Integration
+  private recommendationEngine: RecommendationEngine;
+  private currentUserId = 'default_user'; // Will be set dynamically
 
   // Configuration
   private readonly MAX_WORKERS = 30;
@@ -70,12 +85,21 @@ export class FeedLoadingService {
   // Continuous generation state
   private maxGeneratedPosition = 0;
   private continuousGenerationEnabled = false;
-  private backgroundGenerationTimer: NodeJS.Timeout | null = null;
+  private backgroundGenerationTimer: ReturnType<typeof setInterval> | null = null;
   private userImageBase64: string | null = null;
 
   constructor() {
-    console.log('[LOADING] 🚀 FRESH FeedLoadingService initialization with', this.MAX_WORKERS, 'parallel workers');
+    console.log('[LOADING] 🚀 FRESH FeedLoadingService initialization with', this.MAX_WORKERS, 'parallel workers + VirtualTryOn');
     this.initializeWorkers();
+
+    // 🚨 NEW: Initialize Virtual Try-On Service
+    this.virtualTryOnService = new VirtualTryOnService();
+    this.preloadProductCatalog();
+
+    // 🚨 ULTRATHINK: Initialize Smart Recommendation Engine
+    this.recommendationEngine = new RecommendationEngine();
+    this.initializeRecommendationEngine();
+
     // Don't start continuous generation immediately - wait for user image
     // this.startContinuousGeneration(); // Disabled to prevent excessive initial loads
   }
@@ -94,6 +118,207 @@ export class FeedLoadingService {
         avgDuration: 0
       });
     }
+  }
+
+  /**
+   * 🛍️ NEW: Preload real product catalog for virtual try-on
+   */
+  private async preloadProductCatalog() {
+    try {
+      console.log('[PRODUCTS] 🛍️ Preloading real product catalog...');
+
+      // Fetch initial product catalog from multiple retailers
+      const productPromises = [
+        this.virtualTryOnService.fetchRealProducts('tops', { limit: 20 }),
+        this.virtualTryOnService.fetchRealProducts('bottoms', { limit: 20 }),
+        this.virtualTryOnService.fetchRealProducts('dresses', { limit: 15 }),
+        this.virtualTryOnService.fetchRealProducts('outerwear', { limit: 15 }),
+        this.virtualTryOnService.fetchRealProducts('shoes', { limit: 10 })
+      ];
+
+      const productResults = await Promise.allSettled(productPromises);
+
+      // Combine all successful product fetches
+      this.availableProducts = productResults
+        .filter((result): result is PromiseFulfilledResult<Product[]> => result.status === 'fulfilled')
+        .flatMap(result => result.value);
+
+      console.log(`[PRODUCTS] ✅ Preloaded ${this.availableProducts.length} real products for virtual try-on`);
+
+      // Cache products by category for faster lookup
+      const categories = ['tops', 'bottoms', 'dresses', 'outerwear', 'shoes', 'accessories'];
+      categories.forEach(category => {
+        const categoryProducts = this.availableProducts.filter(p =>
+          p.category.toLowerCase().includes(category) ||
+          p.tags.some(tag => tag.toLowerCase().includes(category))
+        );
+        this.productCache.set(category, categoryProducts);
+      });
+
+    } catch (error) {
+      console.error('[PRODUCTS] ❌ Failed to preload product catalog:', error);
+      // Continue with fallbacks - the system will generate fallback products
+    }
+  }
+
+  /**
+   * 🧠 ULTRATHINK: Initialize Smart Recommendation Engine
+   */
+  private async initializeRecommendationEngine(): Promise<void> {
+    try {
+      console.log('[RECOMMENDATION] 🧠 Initializing intelligent recommendation engine...');
+      await this.recommendationEngine.initialize();
+      console.log('[RECOMMENDATION] ✅ Smart recommendation engine ready');
+    } catch (error) {
+      console.error('[RECOMMENDATION] ❌ Failed to initialize recommendation engine:', error);
+      // Continue without recommendations - system will use basic product selection
+    }
+  }
+
+  /**
+   * 🛍️ NEW: Determine if position should use real product virtual try-on
+   */
+  private shouldGenerateRealProduct(position: number): boolean {
+    // Use real products for most positions, fallback to AI for variety
+    // Real products: positions 2, 3, 5, 6, 8, 9, 11, 12, etc. (75% of feed)
+    if (position < 2) return false; // Keep first 2 as reliable mock images
+
+    // Pattern: 3 real products, 1 AI outfit for variety
+    const cycle = (position - 2) % 4;
+    return cycle < 3; // First 3 positions in each cycle use real products
+  }
+
+  /**
+   * 🧠 ULTRATHINK: AI-powered product selection using ML recommendation engine
+   */
+  private async selectProductForPosition(position: number, prompt: string): Promise<Product | null> {
+    if (this.availableProducts.length === 0) {
+      return null;
+    }
+
+    try {
+      // Create recommendation context from prompt
+      const context: RecommendationContext = {
+        occasion: this.extractOccasionFromPrompt(prompt),
+        mood: this.extractMoodFromPrompt(prompt),
+        timeOfDay: this.getTimeOfDay(),
+        socialContext: 'feed_browsing'
+      };
+
+      console.log(`[AI-SELECT] Position ${position}: Getting personalized recommendations with context:`, context);
+
+      // Get personalized recommendations from AI engine
+      const recommendations = await this.recommendationEngine.getPersonalizedRecommendations(
+        this.currentUserId,
+        context,
+        10 // Get top 10 recommendations
+      );
+
+      if (recommendations.length > 0) {
+        // Select recommendation based on position for variety while maintaining personalization
+        const selectedRecommendation = recommendations[position % recommendations.length];
+        const product = selectedRecommendation.product;
+
+        console.log(`[AI-SELECT] ✨ Position ${position}: AI selected ${product.brand.name} ${product.name} (Score: ${selectedRecommendation.score.toFixed(2)}, Reasons: ${selectedRecommendation.reasons.join(', ')})`);
+
+        // Record user interaction for future ML training
+        await this.recommendationEngine.recordUserInteraction(this.currentUserId, {
+          type: 'view',
+          productId: product.id
+        });
+
+        return product;
+      }
+
+      // Fallback to original logic if recommendations fail
+      console.log(`[AI-SELECT] ⚠️ No AI recommendations available, falling back to basic selection`);
+      return this.selectProductBasic(position, prompt);
+
+    } catch (error) {
+      console.error(`[AI-SELECT] ❌ Error getting AI recommendations:`, error);
+      // Fallback to original logic
+      return this.selectProductBasic(position, prompt);
+    }
+  }
+
+  /**
+   * 🔧 Basic product selection fallback (original logic)
+   */
+  private selectProductBasic(position: number, prompt: string): Product | null {
+    // Extract style preferences from prompt
+    const promptLower = prompt.toLowerCase();
+
+    // Determine preferred category based on prompt
+    let preferredCategories: string[] = [];
+
+    if (promptLower.includes('dress') || promptLower.includes('evening') || promptLower.includes('formal')) {
+      preferredCategories = ['dresses', 'formalwear'];
+    } else if (promptLower.includes('jacket') || promptLower.includes('coat') || promptLower.includes('blazer')) {
+      preferredCategories = ['outerwear', 'jackets'];
+    } else if (promptLower.includes('top') || promptLower.includes('shirt') || promptLower.includes('blouse')) {
+      preferredCategories = ['tops', 'shirts'];
+    } else if (promptLower.includes('bottom') || promptLower.includes('pants') || promptLower.includes('jeans')) {
+      preferredCategories = ['bottoms', 'pants'];
+    } else if (promptLower.includes('shoe') || promptLower.includes('sneaker') || promptLower.includes('boot')) {
+      preferredCategories = ['shoes', 'footwear'];
+    } else {
+      // Default: rotate through categories based on position
+      const categories = ['tops', 'bottoms', 'dresses', 'outerwear'];
+      preferredCategories = [categories[position % categories.length]];
+    }
+
+    // Find products matching preferred categories
+    let candidateProducts: Product[] = [];
+
+    for (const category of preferredCategories) {
+      const categoryProducts = this.productCache.get(category) || [];
+      candidateProducts.push(...categoryProducts);
+    }
+
+    // If no category matches found, use all available products
+    if (candidateProducts.length === 0) {
+      candidateProducts = this.availableProducts;
+    }
+
+    // Select product deterministically based on position for consistency
+    const productIndex = (position * 37 + 23) % candidateProducts.length;
+    const selectedProduct = candidateProducts[productIndex];
+
+    console.log(`[PRODUCT-SELECT] Position ${position}: Selected ${selectedProduct.brand.name} ${selectedProduct.name} from ${candidateProducts.length} candidates`);
+
+    return selectedProduct;
+  }
+
+  /**
+   * 🧠 Helper methods for AI recommendation context
+   */
+  private extractOccasionFromPrompt(prompt: string): string {
+    const promptLower = prompt.toLowerCase();
+    if (promptLower.includes('formal') || promptLower.includes('business') || promptLower.includes('professional')) return 'formal';
+    if (promptLower.includes('party') || promptLower.includes('night out') || promptLower.includes('evening')) return 'party';
+    if (promptLower.includes('casual') || promptLower.includes('everyday') || promptLower.includes('relaxed')) return 'casual';
+    if (promptLower.includes('workout') || promptLower.includes('gym') || promptLower.includes('sport')) return 'workout';
+    if (promptLower.includes('date') || promptLower.includes('romantic')) return 'date';
+    return 'casual'; // Default
+  }
+
+  private extractMoodFromPrompt(prompt: string): string {
+    const promptLower = prompt.toLowerCase();
+    if (promptLower.includes('confident') || promptLower.includes('bold') || promptLower.includes('powerful')) return 'confident';
+    if (promptLower.includes('elegant') || promptLower.includes('sophisticated') || promptLower.includes('classy')) return 'elegant';
+    if (promptLower.includes('fun') || promptLower.includes('playful') || promptLower.includes('vibrant')) return 'playful';
+    if (promptLower.includes('minimal') || promptLower.includes('simple') || promptLower.includes('clean')) return 'minimal';
+    if (promptLower.includes('edgy') || promptLower.includes('rebellious') || promptLower.includes('alternative')) return 'edgy';
+    return 'versatile'; // Default
+  }
+
+  private getTimeOfDay(): string {
+    const hour = new Date().getHours();
+    if (hour < 6) return 'night';
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    if (hour < 21) return 'evening';
+    return 'night';
   }
 
   /**
@@ -361,9 +586,80 @@ export class FeedLoadingService {
   }
 
   /**
-   * Generate image using Rork Toolkit API + CIRCUIT BREAKER PROTECTION
+   * 🛍️ NEW: Generate virtual try-on with real products + CIRCUIT BREAKER PROTECTION
    */
   private async generateImage(job: LoadingJob): Promise<GeneratedImage> {
+    // Determine if this should be a real product virtual try-on
+    const shouldUseRealProduct = this.shouldGenerateRealProduct(job.position);
+
+    if (shouldUseRealProduct && this.availableProducts.length > 0) {
+      return this.generateRealProductTryOn(job);
+    } else {
+      // Fallback to AI outfit generation for positions without products
+      return this.generateAIOutfit(job);
+    }
+  }
+
+  /**
+   * 🛍️ NEW: Generate virtual try-on with real products
+   */
+  private async generateRealProductTryOn(job: LoadingJob): Promise<GeneratedImage> {
+    const startTime = Date.now();
+
+    try {
+      // Select appropriate real product based on position and prompt
+      const selectedProduct = await this.selectProductForPosition(job.position, job.prompt);
+
+      if (!selectedProduct) {
+        console.warn(`[VIRTUAL-TRYON] No suitable product found for position ${job.position}, falling back to AI`);
+        return this.generateAIOutfit(job);
+      }
+
+      console.log(`[VIRTUAL-TRYON] 🛍️ Generating try-on with ${selectedProduct.brand.name} ${selectedProduct.name} for position ${job.position}`);
+
+      // Perform virtual try-on with real product
+      const tryOnResult = await this.virtualTryOnService.performVirtualTryOn(
+        job.userImageBase64,
+        selectedProduct
+      );
+
+      // Record successful API call
+      this.recordApiRequest(true);
+
+      // Reset circuit breaker if we were in HALF_OPEN
+      if (this.circuitBreakerState === 'HALF_OPEN') {
+        this.circuitBreakerState = 'CLOSED';
+        console.log('[CIRCUIT-BREAKER] ✅ Switched to CLOSED - VirtualTryOn API recovered');
+      }
+
+      return {
+        id: job.id,
+        imageUrl: tryOnResult.resultImageUrl,
+        prompt: `Real product: ${selectedProduct.brand.name} ${selectedProduct.name}`,
+        position: job.position,
+        cached: true,
+        timestamp: Date.now(),
+        product: selectedProduct,
+        virtualTryOnResult: tryOnResult,
+        type: 'product'
+      };
+
+    } catch (error) {
+      console.error(`[VIRTUAL-TRYON] ❌ Failed virtual try-on for position ${job.position}:`, error);
+
+      // Record failed API call
+      this.recordApiRequest(false);
+      this.evaluateCircuitBreaker();
+
+      // Fallback to AI outfit generation
+      return this.generateAIOutfit(job);
+    }
+  }
+
+  /**
+   * 🎨 UPDATED: Generate AI outfit (fallback method)
+   */
+  private async generateAIOutfit(job: LoadingJob): Promise<GeneratedImage> {
     // 🚨 CIRCUIT BREAKER CHECK
     if (this.circuitBreakerState === 'OPEN') {
       // Check if we can retry
@@ -432,7 +728,8 @@ export class FeedLoadingService {
         prompt: job.prompt,
         position: job.position,
         cached: true,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        type: 'outfit'
       };
 
     } catch (error) {
@@ -500,7 +797,8 @@ export class FeedLoadingService {
           id: `preload_${pos}_${now}`,
           prompt: this.getPromptForPosition(pos),
           priority: pos <= currentIndex + 3 ? 'critical' : 'preload', // Reduced critical range from 5 to 3
-          position: pos
+          position: pos,
+          userImageBase64: this.userImageBase64 || ''
         });
 
         // 🚨 HARD LIMIT: Max 12 jobs per preload trigger (balanced for responsiveness)
@@ -516,14 +814,15 @@ export class FeedLoadingService {
           id: `cache_${pos}_${now}`,
           prompt: this.getPromptForPosition(pos),
           priority: 'cache',
-          position: pos
+          position: pos,
+          userImageBase64: this.userImageBase64 || ''
         });
       }
     }
 
     if (jobs.length > 0) {
       console.log('[PRELOAD] 🧠 Scheduling', jobs.length, 'intelligent preload jobs (throttled)');
-      this.queueJobs(jobs, this.userImageBase64);
+      this.queueJobs(jobs, this.userImageBase64 || '');
     }
 
     // Trigger continuous generation check (LESS FREQUENT)
@@ -782,7 +1081,8 @@ export class FeedLoadingService {
           id: uniqueId,
           prompt,
           priority: 'critical' as const,
-          position: pos
+          position: pos,
+          userImageBase64: this.userImageBase64 || ''
         });
 
         console.log(`[BUFFER] 🚨 Queuing critical gap at position ${pos}`);
@@ -807,7 +1107,8 @@ export class FeedLoadingService {
             id: uniqueId,
             prompt,
             priority: 'cache' as const,
-            position: pos
+            position: pos,
+            userImageBase64: this.userImageBase64 || ''
           });
 
           console.log(`[BUFFER] 📦 Queuing ahead position ${pos}`);
@@ -820,7 +1121,7 @@ export class FeedLoadingService {
 
     if (jobs.length > 0) {
       console.log('[LOADING] 🚀 Generating controlled buffer batch:', jobs.length, 'images (gaps + ahead) - OVERFLOW PROTECTED');
-      this.queueJobs(jobs, this.userImageBase64);
+      this.queueJobs(jobs, this.userImageBase64 || '');
 
       // Update maxGenerated more conservatively
       const maxJobPosition = Math.max(...jobs.map(j => j.position));
@@ -1060,7 +1361,8 @@ export class FeedLoadingService {
       prompt: job.prompt,
       position: job.position,
       cached: true,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      type: 'outfit'
     };
   }
 
@@ -1089,7 +1391,7 @@ export class FeedLoadingService {
   /**
    * Generate product fallback for hybrid feed shopping experience
    */
-  private generateProductFallback(job: LoadingJob): any {
+  private generateProductFallback(job: LoadingJob): GeneratedImage {
     // Generate unique product data
     const productId = Math.abs(job.position * 23 + 47) % 10000;
     const imageId = Math.abs(job.position * 41 + 73) % 1000;
@@ -1115,51 +1417,38 @@ export class FeedLoadingService {
 
     console.log('[FALLBACK] 🛍️ Generated product fallback for position', job.position, `(${brand} ${category})`);
 
+    const productData: Product = {
+      id: productId.toString(),
+      name: `${color} ${category}`,
+      description: `Stylish ${color.toLowerCase()} ${category.toLowerCase()} from ${brand}`,
+      brand: {
+        name: brand,
+        logo: `https://ui-avatars.com/api/?name=${brand}&size=128&background=667eea&color=ffffff`
+      },
+      category: category,
+      price: basePrice / 100, // Convert cents to dollars
+      originalPrice: isOnSale ? basePrice / 70 : undefined, // Original price if on sale
+      currency: 'USD',
+      images: [this.getProductFallbackImage(productId, brand, category, color)],
+      colors: [color],
+      sizes: sizes,
+      tags: ['trendy', 'popular', 'fallback'],
+      isOnSale: isOnSale,
+      inStock: true,
+      rating: 4.0 + (productId % 10) / 10, // Rating 4.0-4.9
+      reviewCount: 50 + (productId % 200),
+      url: `https://example.com/products/${productId}`
+    };
+
     return {
       id: job.id,
-      type: 'product', // Critical: marks this as a product entry
-      product: {
-        id: productId,
-        name: `${color} ${category}`,
-        description: `Stylish ${color.toLowerCase()} ${category.toLowerCase()} from ${brand}`,
-        brand: {
-          name: brand,
-          logo_url: `https://ui-avatars.com/api/?name=${brand}&size=128&background=667eea&color=ffffff`
-        },
-        category: {
-          name: category,
-          slug: category.toLowerCase().replace(/\s+/g, '-')
-        },
-        base_price: basePrice,
-        sale_price: salePrice,
-        currency: 'USD',
-        mainImage: this.getProductFallbackImage(productId, brand, category, color),
-        images: [
-          {
-            id: 1,
-            original_url: this.getProductFallbackImage(productId, brand, category, color),
-            alt: `${brand} ${color} ${category}`
-          }
-        ],
-        variants: [
-          {
-            id: 1,
-            color: color,
-            size: sizes[productId % sizes.length],
-            current_price: basePrice,
-            sale_price: salePrice,
-            stock_quantity: 10 + (productId % 20),
-            is_available: true
-          }
-        ],
-        availableSizes: sizes,
-        availableColors: [color],
-        tags: ['trendy', 'popular', 'fallback'],
-        isOnSale: isOnSale,
-        popularity_score: 50 + (productId % 50),
-        url: `https://example.com/products/${productId}`
-      },
-      timestamp: Date.now()
+      imageUrl: this.getProductFallbackImage(productId, brand, category, color),
+      prompt: `Product fallback: ${brand} ${color} ${category}`,
+      position: job.position,
+      cached: true,
+      timestamp: Date.now(),
+      product: productData,
+      type: 'product'
     };
   }
 

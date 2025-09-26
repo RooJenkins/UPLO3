@@ -17,6 +17,7 @@ import { FeedEntry } from '@/providers/FeedProvider';
 import { useFavorites } from '@/providers/FavoritesProvider';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
+import { ClothingItemCard } from './ClothingItemCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -32,6 +33,14 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
+
+  // Reset image state when entry changes - moved before any returns
+  useEffect(() => {
+    if (entry?.id && entry?.imageUrl) {
+      setImageError(false);
+      setImageLoaded(false);
+    }
+  }, [entry?.id, entry?.imageUrl]);
 
   // Safety check for entry prop
   if (!entry) {
@@ -56,12 +65,6 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
   if (safeImageUrl !== entry.imageUrl) {
     console.warn('[FEEDCARD] 🚨 Invalid image URL detected in FeedCard:', entry.imageUrl, 'using fallback for entry:', entry.id);
   }
-
-  // Reset image state when entry changes
-  useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
-  }, [entry.id, entry.imageUrl]);
 
   const handleDoubleTap = () => {
     const now = Date.now();
@@ -245,18 +248,49 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
         </TouchableOpacity>
       </View>
 
-      {/* Outfit info */}
+      {/* Clothing item info */}
       <View style={styles.infoContainer}>
-        <Text style={styles.styleText}>{entry.metadata?.style || entry.prompt || 'Trending Style'}</Text>
-        <Text style={styles.occasionText}>{entry.metadata?.occasion || 'Perfect for any occasion'}</Text>
+        {entry.items && entry.items.length > 0 && (
+          <>
+            {/* Display the featured item (or first item) */}
+            <ClothingItemCard
+              item={entry.items.find(item => item.featured) || entry.items[0]}
+              compact={false}
+            />
 
-        <TouchableOpacity
-          style={styles.shopButton}
-          onPress={handleShop}
-        >
-          <ShoppingBag size={20} color="#fff" />
-          <Text style={styles.shopButtonText}>Shop this look</Text>
-        </TouchableOpacity>
+            {/* Shop button for the featured item */}
+            <TouchableOpacity
+              style={styles.shopButton}
+              onPress={() => {
+                const featuredItem = entry.items.find(item => item.featured) || entry.items[0];
+                if (featuredItem?.buyUrl) {
+                  // Open the product URL
+                  console.log('Opening product URL:', featuredItem.buyUrl);
+                } else {
+                  handleShop(); // Fallback to existing shop handler
+                }
+              }}
+            >
+              <ShoppingBag size={20} color="#fff" />
+              <Text style={styles.shopButtonText}>Shop Now</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Fallback for entries without items */}
+        {(!entry.items || entry.items.length === 0) && (
+          <>
+            <Text style={styles.styleText}>{entry.metadata?.style || entry.prompt || 'Trending Style'}</Text>
+            <Text style={styles.occasionText}>{entry.metadata?.occasion || 'Perfect for any occasion'}</Text>
+            <TouchableOpacity
+              style={styles.shopButton}
+              onPress={handleShop}
+            >
+              <ShoppingBag size={20} color="#fff" />
+              <Text style={styles.shopButtonText}>Shop this look</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -335,6 +369,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignSelf: 'flex-start',
     gap: 8,
+    marginTop: 12, // Add spacing from the ClothingItemCard
   },
   shopButtonText: {
     color: '#fff',

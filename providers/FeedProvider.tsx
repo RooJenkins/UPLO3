@@ -8,10 +8,27 @@ import { ProductFeedEntry } from '@/components/ProductFeedCard';
 export interface OutfitItem {
   id: string;
   name: string;
-  brand: string;
-  price: string;
+  brand: {
+    name: string;
+    logo?: string; // Brand logo URL
+    logoText?: string; // Fallback text for logos
+  };
+  price: {
+    current: number;
+    original?: number; // For sale items
+    currency: string;
+    formatted: string; // e.g., "$59.99"
+    isOnSale: boolean;
+  };
   category: string;
+  availability: {
+    colors: string[];
+    sizes: string[];
+    inStock: boolean;
+  };
+  description?: string;
   buyUrl?: string;
+  featured?: boolean; // For highlighting main items like in the images
 }
 
 export interface FeedEntry {
@@ -56,6 +73,196 @@ const validateImageUrl = (url: string | null | undefined, fallbackUrl: string, c
   }
 
   return url;
+};
+
+// 🚨 ULTRATHINK: Enhanced clothing item generation for realistic feed experience
+const generateRealisticOutfitItems = (prompt: string, position: number): OutfitItem[] => {
+  // Brand pool with realistic fashion brands and their logo URLs
+  const brands = [
+    {
+      name: 'ASOS',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/ASOS-Logo.png',
+      logoText: 'ASOS'
+    },
+    {
+      name: 'Zara',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Zara-Logo.png',
+      logoText: 'ZARA'
+    },
+    {
+      name: 'H&M',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/HM-Logo.png',
+      logoText: 'H&M'
+    },
+    {
+      name: 'Nike',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Nike-Logo.png',
+      logoText: '✓'
+    },
+    {
+      name: 'Adidas',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Adidas-Logo.png',
+      logoText: 'adidas'
+    },
+    {
+      name: 'Uniqlo',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Uniqlo-Logo.png',
+      logoText: 'UNIQLO'
+    },
+    {
+      name: 'Forever 21',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Forever-21-Logo.png',
+      logoText: '21'
+    },
+    {
+      name: 'Mango',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Mango-Logo.png',
+      logoText: 'MANGO'
+    },
+    {
+      name: 'COS',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/COS-Logo.png',
+      logoText: 'COS'
+    },
+    {
+      name: 'Massimo Dutti',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Massimo-Dutti-Logo.png',
+      logoText: 'MD'
+    },
+    {
+      name: 'Urban Outfitters',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Urban-Outfitters-Logo.png',
+      logoText: 'UO'
+    },
+    {
+      name: 'Pull & Bear',
+      logo: 'https://logos-world.net/wp-content/uploads/2020/04/Pull-Bear-Logo.png',
+      logoText: 'P&B'
+    }
+  ];
+
+  // Product name generators based on style/category
+  const productNames = {
+    dress: ['Summer Midi Dress', 'Floral Maxi Dress', 'Wrap Dress', 'Bodycon Dress', 'Shift Dress', 'A-Line Dress'],
+    top: ['Cropped T-Shirt', 'Oversized Hoodie', 'Silk Blouse', 'Tank Top', 'Cardigan', 'Sweater'],
+    bottom: ['High-Waist Jeans', 'Tailored Trousers', 'Mini Skirt', 'Pleated Skirt', 'Cargo Pants', 'Wide-Leg Pants'],
+    shoes: ['Platform Sneakers', 'Ankle Boots', 'Loafers', 'Ballet Flats', 'Heeled Sandals', 'Combat Boots'],
+    accessory: ['Chain Necklace', 'Crossbody Bag', 'Sunglasses', 'Belt', 'Hair Clip', 'Bracelet']
+  };
+
+  const colors = ['Black', 'White', 'Navy', 'Beige', 'Pink', 'Blue', 'Green', 'Red', 'Brown', 'Gray'];
+  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  // Determine style from prompt
+  const isBusinessWear = prompt.toLowerCase().includes('business') || prompt.toLowerCase().includes('professional') || prompt.toLowerCase().includes('formal');
+  const isCasualWear = prompt.toLowerCase().includes('casual') || prompt.toLowerCase().includes('weekend') || prompt.toLowerCase().includes('relaxed');
+  const isSummerWear = prompt.toLowerCase().includes('summer') || prompt.toLowerCase().includes('beach') || prompt.toLowerCase().includes('vacation');
+  const isEveningWear = prompt.toLowerCase().includes('evening') || prompt.toLowerCase().includes('dinner') || prompt.toLowerCase().includes('date');
+
+  // Generate 1-3 items based on outfit type
+  const items: OutfitItem[] = [];
+  const usedBrands = new Set<string>();
+
+  // Featured item (main piece like dress or top)
+  const getFeaturedItem = (): OutfitItem => {
+    let category = 'top';
+    let productCategory: keyof typeof productNames = 'top';
+
+    if (isSummerWear || isEveningWear) {
+      category = 'dress';
+      productCategory = 'dress';
+    } else if (isBusinessWear) {
+      category = Math.random() > 0.5 ? 'top' : 'dress';
+      productCategory = category as keyof typeof productNames;
+    }
+
+    const brand = brands[Math.floor(Math.random() * brands.length)];
+    usedBrands.add(brand.name);
+
+    const basePrice = Math.floor(Math.random() * 80) + 20; // $20-$100
+    const isOnSale = Math.random() > 0.6; // 40% chance of being on sale
+    const salePrice = isOnSale ? Math.floor(basePrice * (0.6 + Math.random() * 0.3)) : basePrice; // 60-90% of original
+
+    const productName = productNames[productCategory][Math.floor(Math.random() * productNames[productCategory].length)];
+
+    return {
+      id: `featured_${position}_${Date.now()}`,
+      name: productName,
+      brand: {
+        name: brand.name,
+        logo: brand.logo,
+        logoText: brand.logoText
+      },
+      price: {
+        current: salePrice,
+        original: isOnSale ? basePrice : undefined,
+        currency: 'USD',
+        formatted: `$${salePrice}.99`,
+        isOnSale
+      },
+      category,
+      availability: {
+        colors: colors.slice(0, Math.floor(Math.random() * 4) + 2), // 2-5 colors
+        sizes: sizes.slice(0, Math.floor(Math.random() * 4) + 3), // 3-6 sizes
+        inStock: Math.random() > 0.1 // 90% in stock
+      },
+      description: `${productName} in ${colors[0].toLowerCase()}`,
+      buyUrl: `https://${brand.name.toLowerCase().replace(/\s+/g, '')}.com/product/${position}`,
+      featured: true
+    };
+  };
+
+  // Add featured item
+  items.push(getFeaturedItem());
+
+  // Add 1-2 complementary items
+  const numAdditionalItems = Math.floor(Math.random() * 2) + 1; // 1-2 additional items
+
+  for (let i = 0; i < numAdditionalItems; i++) {
+    const availableBrands = brands.filter(b => !usedBrands.has(b.name));
+    if (availableBrands.length === 0) continue;
+
+    const brand = availableBrands[Math.floor(Math.random() * availableBrands.length)];
+    usedBrands.add(brand.name);
+
+    const categories = ['shoes', 'accessory', 'bottom'];
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    const productCategory = category as keyof typeof productNames;
+
+    const basePrice = Math.floor(Math.random() * 60) + 15; // $15-$75 for accessories
+    const isOnSale = Math.random() > 0.7; // 30% chance of being on sale
+    const salePrice = isOnSale ? Math.floor(basePrice * (0.65 + Math.random() * 0.25)) : basePrice;
+
+    const productName = productNames[productCategory][Math.floor(Math.random() * productNames[productCategory].length)];
+
+    items.push({
+      id: `item_${i}_${position}_${Date.now()}`,
+      name: productName,
+      brand: {
+        name: brand.name,
+        logo: brand.logo,
+        logoText: brand.logoText
+      },
+      price: {
+        current: salePrice,
+        original: isOnSale ? basePrice : undefined,
+        currency: 'USD',
+        formatted: `$${salePrice}.99`,
+        isOnSale
+      },
+      category,
+      availability: {
+        colors: colors.slice(0, Math.floor(Math.random() * 3) + 1), // 1-3 colors
+        sizes: category === 'shoes' ? ['6', '7', '8', '9', '10'] : sizes.slice(0, Math.floor(Math.random() * 3) + 2),
+        inStock: Math.random() > 0.15 // 85% in stock
+      },
+      description: `${productName} from ${brand.name}`,
+      buyUrl: `https://${brand.name.toLowerCase().replace(/\s+/g, '')}.com/product/${position}_${i}`,
+      featured: false
+    });
+  }
+
+  return items;
 };
 
 // 🚨 ULTRATHINK: Removed initial mock feed - start with empty feed for pure AI generation
@@ -205,23 +412,86 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           // 🚨 CRITICAL: Validate image URL before creating feed entry
           const validatedImageUrl = validateImageUrl(cachedImage.imageUrl, FALLBACK_IMAGE_1, `position ${i}, cached image ${cachedImage.id?.substring(0, 12) || 'undefined'}`);
 
-          const feedEntry: FeedEntry = {
-            id: cachedImage.id,
-            imageUrl: validatedImageUrl,
-            prompt: cachedImage.prompt,
-            outfitId: `outfit_${cachedImage.id}`,
-            items: [
-              { id: '1', name: 'AI Generated Top', brand: 'AI Fashion', price: '$29.99', category: 'tops' },
-              { id: '2', name: 'AI Generated Bottom', brand: 'AI Fashion', price: '$59.99', category: 'bottoms' },
-            ],
-            metadata: {
-              style: 'generated',
-              occasion: 'ai-created',
-              season: 'all',
-              colors: ['auto']
-            },
-            timestamp: cachedImage.timestamp,
-          };
+          // 🛍️ NEW: Handle real product data vs AI outfit
+          let feedEntry: FeedEntry;
+
+          if (cachedImage.type === 'product' && cachedImage.product) {
+            // 🛍️ Real product virtual try-on result
+            const product = cachedImage.product;
+
+            const realProductItem: OutfitItem = {
+              id: product.id,
+              name: product.name,
+              brand: {
+                name: product.brand.name,
+                logo: product.brand.logo,
+                logoText: product.brand.name.charAt(0)
+              },
+              price: {
+                current: product.price,
+                original: product.originalPrice,
+                currency: product.currency,
+                formatted: `${product.currency === 'USD' ? '$' : ''}${product.price.toFixed(2)}`,
+                isOnSale: product.isOnSale || false
+              },
+              category: product.category,
+              availability: {
+                colors: product.colors || [],
+                sizes: product.sizes || [],
+                inStock: product.inStock || true
+              },
+              description: product.description,
+              buyUrl: product.url,
+              featured: true
+            };
+
+            feedEntry = {
+              id: cachedImage.id,
+              imageUrl: validatedImageUrl,
+              prompt: cachedImage.prompt,
+              outfitId: `real_product_${cachedImage.id}`,
+              items: [realProductItem],
+              metadata: {
+                style: product.tags.find(tag => ['casual', 'formal', 'trendy', 'elegant'].includes(tag.toLowerCase())) || 'trendy',
+                occasion: product.tags.find(tag => ['work', 'date', 'casual', 'party'].includes(tag.toLowerCase())) || 'everyday',
+                season: 'all-season',
+                colors: product.colors || [realProductItem.availability.colors[0] || 'multi']
+              },
+              timestamp: cachedImage.timestamp,
+              type: 'outfit' // Keep as outfit for UI consistency
+            };
+
+            console.log(`[FEED] 🛍️ Created real product feed entry: ${product.brand.name} ${product.name} at position ${i}`);
+
+          } else {
+            // 🎨 AI-generated outfit (fallback or regular AI generation)
+            const realisticItems = generateRealisticOutfitItems(cachedImage.prompt, i);
+
+            feedEntry = {
+              id: cachedImage.id,
+              imageUrl: validatedImageUrl,
+              prompt: cachedImage.prompt,
+              outfitId: `outfit_${cachedImage.id}`,
+              items: realisticItems,
+              metadata: {
+                style: cachedImage.prompt.toLowerCase().includes('business') ? 'professional' :
+                       cachedImage.prompt.toLowerCase().includes('casual') ? 'casual' :
+                       cachedImage.prompt.toLowerCase().includes('evening') ? 'elegant' : 'trendy',
+                occasion: cachedImage.prompt.toLowerCase().includes('business') ? 'work' :
+                         cachedImage.prompt.toLowerCase().includes('date') ? 'date night' :
+                         cachedImage.prompt.toLowerCase().includes('weekend') ? 'casual' : 'everyday',
+                season: cachedImage.prompt.toLowerCase().includes('summer') ? 'summer' :
+                       cachedImage.prompt.toLowerCase().includes('winter') ? 'winter' :
+                       cachedImage.prompt.toLowerCase().includes('spring') ? 'spring' :
+                       cachedImage.prompt.toLowerCase().includes('autumn') ? 'autumn' : 'all-season',
+                colors: realisticItems[0]?.availability?.colors || ['multi']
+              },
+              timestamp: cachedImage.timestamp,
+              type: 'outfit'
+            };
+
+            console.log(`[FEED] 🎨 Created AI outfit feed entry at position ${i}`);
+          }
 
           // Extend array if needed
           while (updatedFeed.length <= i) {
@@ -350,27 +620,27 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     // 🚨 ULTRATHINK: Generate images starting from position 0 to replace stock images
     const initialJobs = [
       // Critical - immediately visible (starting from position 0)
-      { id: generateUniqueId(0), prompt: getSmartPrompt(0), priority: 'critical' as const, position: 0 },
-      { id: generateUniqueId(1), prompt: getSmartPrompt(1), priority: 'critical' as const, position: 1 },
-      { id: generateUniqueId(2), prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2 },
-      { id: generateUniqueId(3), prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3 },
-      { id: generateUniqueId(4), prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4 },
+      { id: generateUniqueId(0), prompt: getSmartPrompt(0), priority: 'critical' as const, position: 0, userImageBase64 },
+      { id: generateUniqueId(1), prompt: getSmartPrompt(1), priority: 'critical' as const, position: 1, userImageBase64 },
+      { id: generateUniqueId(2), prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2, userImageBase64 },
+      { id: generateUniqueId(3), prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3, userImageBase64 },
+      { id: generateUniqueId(4), prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4, userImageBase64 },
 
       // High priority preload
-      { id: generateUniqueId(5), prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5 },
-      { id: generateUniqueId(6), prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6 },
-      { id: generateUniqueId(7), prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7 },
-      { id: generateUniqueId(8), prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8 },
-      { id: generateUniqueId(9), prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9 },
+      { id: generateUniqueId(5), prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5, userImageBase64 },
+      { id: generateUniqueId(6), prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6, userImageBase64 },
+      { id: generateUniqueId(7), prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7, userImageBase64 },
+      { id: generateUniqueId(8), prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8, userImageBase64 },
+      { id: generateUniqueId(9), prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9, userImageBase64 },
 
       // Background cache
-      { id: generateUniqueId(10), prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10 },
-      { id: generateUniqueId(11), prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11 },
-      { id: generateUniqueId(12), prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12 },
-      { id: generateUniqueId(13), prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13 },
-      { id: generateUniqueId(14), prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14 },
-      { id: generateUniqueId(15), prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15 },
-      { id: generateUniqueId(16), prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16 },
+      { id: generateUniqueId(10), prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10, userImageBase64 },
+      { id: generateUniqueId(11), prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11, userImageBase64 },
+      { id: generateUniqueId(12), prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12, userImageBase64 },
+      { id: generateUniqueId(13), prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13, userImageBase64 },
+      { id: generateUniqueId(14), prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14, userImageBase64 },
+      { id: generateUniqueId(15), prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15, userImageBase64 },
+      { id: generateUniqueId(16), prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16, userImageBase64 },
     ];
 
     console.log('[FEED] 🎯 Generated', initialJobs.length, 'ULTRA-UNIQUE initialization jobs. Session:', sessionId.substring(0,8));
@@ -417,7 +687,8 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           id: uniqueId,
           prompt: getSmartPrompt(i),
           priority: 'critical' as const,
-          position: i
+          position: i,
+          userImageBase64
         });
         console.log(`[FEED] ⚡ Queuing critical position ${i} with ULTRA-UNIQUE ID: ${uniqueId?.substring(0, 35) || 'undefined'}...`);
       }
