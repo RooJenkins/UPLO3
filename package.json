@@ -13,7 +13,9 @@
     "clean": "rm -rf node_modules bun.lockb .expo && bun install",
     "test-api": "curl -f http://localhost:8081/api/ || echo 'API not reachable'",
     "debug": "curl -f http://localhost:8081/api/debug || echo 'Debug endpoint not reachable'",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
