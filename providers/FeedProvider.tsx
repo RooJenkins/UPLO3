@@ -58,49 +58,10 @@ const validateImageUrl = (url: string | null | undefined, fallbackUrl: string, c
   return url;
 };
 
-const INITIAL_FEED: FeedEntry[] = [
-  {
-    id: 'mock-1-ultra-reliable',
-    imageUrl: validateImageUrl(MOCK_IMAGE_1, FALLBACK_IMAGE_1, 'initial mock feed entry 1'),
-    prompt: 'Casual everyday outfit - placeholder',
-    outfitId: 'mock-outfit-1',
-    items: [
-      { id: '1', name: 'White T-Shirt', brand: 'Uniqlo', price: '$19.90', category: 'tops' },
-      { id: '2', name: 'Blue Jeans', brand: 'Levi\'s', price: '$89.50', category: 'bottoms' },
-    ],
-    metadata: {
-      style: 'casual',
-      occasion: 'everyday',
-      season: 'all',
-      colors: ['white', 'blue'],
-    },
-    timestamp: Date.now() - 1000,
-    // Add fallback URL for extra reliability
-    fallbackImageUrl: FALLBACK_IMAGE_1,
-  },
-  {
-    id: 'mock-2-ultra-reliable',
-    imageUrl: validateImageUrl(MOCK_IMAGE_2, FALLBACK_IMAGE_2, 'initial mock feed entry 2'),
-    prompt: 'Business casual outfit - placeholder',
-    outfitId: 'mock-outfit-2',
-    items: [
-      { id: '3', name: 'Blazer', brand: 'Zara', price: '$129.00', category: 'outerwear' },
-      { id: '4', name: 'Dress Shirt', brand: 'H&M', price: '$39.99', category: 'tops' },
-    ],
-    metadata: {
-      style: 'business',
-      occasion: 'work',
-      season: 'all',
-      colors: ['navy', 'white'],
-    },
-    timestamp: Date.now() - 2000,
-    // Add fallback URL for extra reliability
-    fallbackImageUrl: FALLBACK_IMAGE_2,
-  },
-];
+// 🚨 ULTRATHINK: Removed initial mock feed - start with empty feed for pure AI generation
+const INITIAL_FEED: FeedEntry[] = [];
 
-console.log('[FEED] 🎯 Initial mock feed created with ultra-reliable data URI images');
-console.log('[FEED] Mock images are embedded data URIs - guaranteed to load');
+console.log('[FEED] 🚨 ULTRATHINK: Empty initial feed - pure AI generation from position 0');
 console.log('[FEED] ✅ Image validation system active - prevents null URL errors');
 
 export const [FeedProvider, useFeed] = createContextHook(() => {
@@ -213,9 +174,9 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       const updatedFeed = [...currentFeed];
       let hasNewImages = false;
 
-      // 🚨 EFFICIENT SCANNING: Only scan reasonable range around user position
+      // 🚨 ULTRATHINK: Scan from position 0 to allow AI generation to replace stock images
       const userPosition = currentIndex;
-      const scanStart = Math.max(2, userPosition - 5); // Don't go too far behind
+      const scanStart = Math.max(0, userPosition - 5); // 🚨 ULTRATHINK: Start from position 0
       const scanEnd = Math.min(userPosition + 50, 200); // Reasonable ahead limit
 
       // Track what we already have to avoid duplicate checking
@@ -386,28 +347,30 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       return `init_${initTimestamp}_${sessionId}_${processId}_${microTime}_${random}_${index}`;
     };
 
-    // Create initial jobs with guaranteed unique IDs and varied prompts
+    // 🚨 ULTRATHINK: Generate images starting from position 0 to replace stock images
     const initialJobs = [
-      // Critical - immediately visible
-      { id: generateUniqueId(0), prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2 },
-      { id: generateUniqueId(1), prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3 },
-      { id: generateUniqueId(2), prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4 },
+      // Critical - immediately visible (starting from position 0)
+      { id: generateUniqueId(0), prompt: getSmartPrompt(0), priority: 'critical' as const, position: 0 },
+      { id: generateUniqueId(1), prompt: getSmartPrompt(1), priority: 'critical' as const, position: 1 },
+      { id: generateUniqueId(2), prompt: getSmartPrompt(2), priority: 'critical' as const, position: 2 },
+      { id: generateUniqueId(3), prompt: getSmartPrompt(3), priority: 'critical' as const, position: 3 },
+      { id: generateUniqueId(4), prompt: getSmartPrompt(4), priority: 'critical' as const, position: 4 },
 
       // High priority preload
-      { id: generateUniqueId(3), prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5 },
-      { id: generateUniqueId(4), prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6 },
-      { id: generateUniqueId(5), prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7 },
-      { id: generateUniqueId(6), prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8 },
-      { id: generateUniqueId(7), prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9 },
+      { id: generateUniqueId(5), prompt: getSmartPrompt(5), priority: 'preload' as const, position: 5 },
+      { id: generateUniqueId(6), prompt: getSmartPrompt(6), priority: 'preload' as const, position: 6 },
+      { id: generateUniqueId(7), prompt: getSmartPrompt(7), priority: 'preload' as const, position: 7 },
+      { id: generateUniqueId(8), prompt: getSmartPrompt(8), priority: 'preload' as const, position: 8 },
+      { id: generateUniqueId(9), prompt: getSmartPrompt(9), priority: 'preload' as const, position: 9 },
 
       // Background cache
-      { id: generateUniqueId(8), prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10 },
-      { id: generateUniqueId(9), prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11 },
-      { id: generateUniqueId(10), prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12 },
-      { id: generateUniqueId(11), prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13 },
-      { id: generateUniqueId(12), prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14 },
-      { id: generateUniqueId(13), prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15 },
-      { id: generateUniqueId(14), prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16 },
+      { id: generateUniqueId(10), prompt: getSmartPrompt(10), priority: 'cache' as const, position: 10 },
+      { id: generateUniqueId(11), prompt: getSmartPrompt(11), priority: 'cache' as const, position: 11 },
+      { id: generateUniqueId(12), prompt: getSmartPrompt(12), priority: 'cache' as const, position: 12 },
+      { id: generateUniqueId(13), prompt: getSmartPrompt(13), priority: 'cache' as const, position: 13 },
+      { id: generateUniqueId(14), prompt: getSmartPrompt(14), priority: 'cache' as const, position: 14 },
+      { id: generateUniqueId(15), prompt: getSmartPrompt(15), priority: 'cache' as const, position: 15 },
+      { id: generateUniqueId(16), prompt: getSmartPrompt(16), priority: 'cache' as const, position: 16 },
     ];
 
     console.log('[FEED] 🎯 Generated', initialJobs.length, 'ULTRA-UNIQUE initialization jobs. Session:', sessionId.substring(0,8));
@@ -575,7 +538,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     resetLoadingService: () => {
       console.log('[FEED] 🔄 Resetting loading service and clearing all caches');
       service.clearAllCaches();
-      setFeed(INITIAL_FEED); // Reset to initial mock data
+      setFeed(INITIAL_FEED); // Reset to empty feed for pure AI generation
       setCurrentIndex(0);
       setHasInitialized(false);
       console.log('[FEED] ✨ Ready for fresh start');
