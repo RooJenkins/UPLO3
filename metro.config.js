@@ -11,7 +11,7 @@ config.resolver.platforms = ['native', 'ios', 'android', 'web'];
 // Create empty module path for Node.js modules
 const emptyModulePath = path.resolve(__dirname, 'empty-module.js');
 
-// Replace problematic Node.js modules and undici with empty modules
+// 🚨 ULTRATHINK: Replace problematic Node.js modules and scraper dependencies with empty modules
 config.resolver.alias = {
   ...(config.resolver.alias || {}),
   // Node.js built-in modules
@@ -26,12 +26,26 @@ config.resolver.alias = {
   'node:events': emptyModulePath,
   // Exclude undici entirely to prevent sqlite issues
   'undici': emptyModulePath,
+  // 🚨 ULTRATHINK: Block scraper Node.js dependencies from bundling
+  'playwright': emptyModulePath,
+  'user-agents': emptyModulePath,
+  'p-queue': emptyModulePath,
+  'cheerio': emptyModulePath,
 };
 
-// Block problematic modules at the resolver level
+// 🚨 ULTRATHINK: Block problematic modules and scraper directories at the resolver level
 config.resolver.blacklistRE = [
   /node_modules\/undici\/lib\/cache\/sqlite-cache-store\.js$/,
   /.*\/node:sqlite$/,
+  // Block scraper directories to prevent bundling Node.js-only code
+  /backend\/scraper\/.*$/,
+  /.*\/BaseAdapter\.ts$/,
+  /.*\/ScraperEngine\.ts$/,
+  /.*\/adapters\/.*Adapter\.ts$/,
+  // Block specific Node.js dependencies
+  /node_modules\/playwright\/.*$/,
+  /node_modules\/user-agents\/.*$/,
+  /node_modules\/p-queue\/.*$/,
 ];
 
 // Add support for API routes and better error handling

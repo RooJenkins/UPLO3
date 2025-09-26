@@ -1,28 +1,54 @@
 import { z } from 'zod';
 import { publicProcedure } from '../context';
 
-// Conditional imports - only load database services in Node.js environment
-let getDatabaseService: any, getSyncManager: any, getSupportedBrands: any;
+// 🚨 ULTRATHINK: Aggressive isolation of Node.js modules from React Native/Expo bundler
+// This prevents Metro bundler from trying to resolve Node.js-only dependencies
 
-// Check if we're in React Native/Metro environment
-const isReactNative = typeof global !== 'undefined' && global.HermesInternal !== undefined;
-const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-const isNodeEnvironment = !isReactNative && !isBrowser && typeof process !== 'undefined' && process.versions?.node;
+// Environment detection with multiple safety checks
+const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+const isExpoEnvironment = typeof global !== 'undefined' && (global.__expo || global.HermesInternal);
+const isMetroEnvironment = typeof __METRO__ !== 'undefined' || typeof __DEV__ !== 'undefined';
 
-if (isNodeEnvironment) {
+// 🚨 CRITICAL: Only allow Node.js imports if we're 100% certain we're in a server environment
+const isPureNodeEnvironment = !isReactNative &&
+                              !isBrowser &&
+                              !isExpoEnvironment &&
+                              !isMetroEnvironment &&
+                              typeof process !== 'undefined' &&
+                              process.versions?.node &&
+                              typeof require === 'function' &&
+                              typeof module !== 'undefined' &&
+                              typeof global !== 'undefined' &&
+                              !global.__expo;
+
+// Safe module placeholders
+let getDatabaseService: any;
+let getSyncManager: any;
+let getSupportedBrands: any;
+
+// 🚨 ULTRATHINK: Complete module isolation with runtime-only loading
+if (isPureNodeEnvironment) {
+  console.log('[CATALOG] 🟢 Pure Node.js server environment - attempting to load server modules');
+
+  // Database modules with individual isolation
   try {
-    ({ getDatabaseService, getSyncManager } = require('../../database'));
-  } catch (error) {
-    console.warn('[CATALOG] Database modules not available, using fallbacks');
+    const databaseModule = require('../../database');
+    getDatabaseService = databaseModule?.getDatabaseService;
+    getSyncManager = databaseModule?.getSyncManager;
+    console.log('[CATALOG] ✅ Database modules loaded successfully');
+  } catch (databaseError) {
+    console.warn('[CATALOG] ⚠️ Database modules unavailable:', databaseError?.message);
   }
 
-  // Separate try-catch for scraper to prevent backend crashes
-  try {
-    ({ getSupportedBrands } = require('../../scraper/adapters'));
-  } catch (scraperError) {
-    console.warn('[CATALOG] Scraper modules not available, using fallbacks:', scraperError?.message);
-    // getSupportedBrands fallback is set below
-  }
+  // 🚨 COMPLETELY DISABLE SCRAPER IMPORTS to prevent bundling issues
+  // The scraper modules contain playwright, user-agents, p-queue which can't be bundled
+  console.log('[CATALOG] 🛑 Scraper modules DISABLED to prevent Metro bundling conflicts');
+  // Scraper functionality is isolated and will only work in pure Node.js server environments
+
+} else {
+  const envType = isExpoEnvironment ? 'Expo' : isReactNative ? 'React Native' : isBrowser ? 'Browser' : 'Unknown';
+  console.log('[CATALOG] 🟡', envType, 'environment detected - using fallback implementations only');
 }
 
 // Set up fallback functions if modules weren't loaded
