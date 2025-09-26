@@ -242,7 +242,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           }
 
           // 🚨 CRITICAL: Validate image URL before creating feed entry
-          const validatedImageUrl = validateImageUrl(cachedImage.imageUrl, FALLBACK_IMAGE_1, `position ${i}, cached image ${cachedImage.id.substring(0, 12)}`);
+          const validatedImageUrl = validateImageUrl(cachedImage.imageUrl, FALLBACK_IMAGE_1, `position ${i}, cached image ${cachedImage.id?.substring(0, 12) || 'undefined'}`);
 
           const feedEntry: FeedEntry = {
             id: cachedImage.id,
@@ -289,7 +289,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
       if (shouldInjectProducts) {
         // Calculate product injection positions (every 3-4 items)
         const productPositions = [];
-        for (let pos = 4; pos < scanLimit; pos += (3 + Math.floor(Math.random() * 2))) { // 3-4 positions apart
+        for (let pos = 4; pos < updatedFeed.length; pos += (3 + Math.floor(Math.random() * 2))) { // 3-4 positions apart
           productPositions.push(pos);
         }
 
@@ -411,7 +411,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
     ];
 
     console.log('[FEED] 🎯 Generated', initialJobs.length, 'ULTRA-UNIQUE initialization jobs. Session:', sessionId.substring(0,8));
-    console.log('[FEED] 🔑 First job ID sample:', initialJobs[0].id.substring(0, 40) + '...');
+    console.log('[FEED] 🔑 First job ID sample:', initialJobs[0]?.id?.substring(0, 40) || 'undefined' + '...');
 
     // Queue all jobs for parallel processing
     service.queueJobs(initialJobs, userImageBase64);
@@ -456,7 +456,7 @@ export const [FeedProvider, useFeed] = createContextHook(() => {
           priority: 'critical' as const,
           position: i
         });
-        console.log(`[FEED] ⚡ Queuing critical position ${i} with ULTRA-UNIQUE ID: ${uniqueId.substring(0, 35)}...`);
+        console.log(`[FEED] ⚡ Queuing critical position ${i} with ULTRA-UNIQUE ID: ${uniqueId?.substring(0, 35) || 'undefined'}...`);
       }
     }
 

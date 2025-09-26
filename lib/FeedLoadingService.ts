@@ -217,8 +217,8 @@ export class FeedLoadingService {
         console.warn('[WORKER] ⚠️ Position already cached by another worker, discarding duplicate:', {
           workerId,
           position: job.position,
-          existingId: existingImage.id.substring(0, 12),
-          newId: result.id.substring(0, 12),
+          existingId: existingImage.id?.substring(0, 12) || 'undefined',
+          newId: result.id?.substring(0, 12) || 'undefined',
           existingTimestamp: existingImage.timestamp,
           newTimestamp: result.timestamp
         });
@@ -229,7 +229,7 @@ export class FeedLoadingService {
 
       // Cache the result only if position is still free
       this.imageCache.set(job.position, result);
-      console.log('[WORKER] ✅ Cached image at position', job.position, 'ID:', result.id.substring(0, 12));
+      console.log('[WORKER] ✅ Cached image at position', job.position, 'ID:', result.id?.substring(0, 12) || 'undefined');
 
       // Preload the image for instant display
       await this.preloadImage(result.imageUrl);
@@ -309,7 +309,7 @@ export class FeedLoadingService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `Change the person's outfit to: ${job.prompt}. Keep the person's face and pose. Full body.`,
+          prompt: `Change the person's outfit to: ${job.prompt}. Keep the person's face and pose. Professional photoshoot setting with clean white or neutral background, studio lighting, full body photo, fashion photography style.`,
           images: [{ type: 'image', image: job.userImageBase64 }],
         }),
       });
@@ -320,9 +320,28 @@ export class FeedLoadingService {
 
       const data = await response.json();
       const image = data?.image;
-      const imageUrl = image?.base64Data && image?.mimeType
-        ? `data:${image.mimeType};base64,${image.base64Data}`
-        : `https://via.placeholder.com/400x600/FF6B6B/FFFFFF?text=${encodeURIComponent('Fallback')}`;
+
+      // Enhanced base64 validation to prevent decoding errors
+      let imageUrl: string;
+      if (image?.base64Data && image?.mimeType) {
+        // Validate base64 data before creating data URI
+        try {
+          // Check if base64 data is valid by testing first few chars
+          const base64Data = image.base64Data.trim();
+          if (base64Data.length > 10 && /^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+            imageUrl = `data:${image.mimeType};base64,${base64Data}`;
+            console.log('[WORKER] ✅ Generated valid base64 image for position', job.position);
+          } else {
+            throw new Error('Invalid base64 format');
+          }
+        } catch (error) {
+          console.warn('[WORKER] ⚠️ Invalid base64 data received, using placeholder for position', job.position);
+          imageUrl = `https://picsum.photos/400/600?random=${Date.now()}`;
+        }
+      } else {
+        console.warn('[WORKER] ⚠️ No image data received, using placeholder for position', job.position);
+        imageUrl = `https://picsum.photos/400/600?random=${Date.now()}`;
+      }
 
       // Record successful API call
       this.recordApiRequest(true);
@@ -366,38 +385,61 @@ export class FeedLoadingService {
     }
   }
 
+  // 🚨 THROTTLING: Prevent rapid-fire preload triggers (BALANCED)
+  private lastPreloadTime = 0;
+  private readonly PRELOAD_THROTTLE_MS = 500; // Reduced to 500ms - more responsive for scrolling
+
   /**
-   * Enhanced intelligent preloading with continuous generation awareness
+   * Enhanced intelligent preloading with continuous generation awareness + ANTI-OVERFLOW PROTECTION
    */
   private scheduleIntelligentPreload(currentIndex: number) {
     if (!this.userImageBase64) return;
 
-    // Calculate adaptive preload distance based on scroll velocity
-    const velocityMultiplier = Math.min(Math.abs(this.scrollVelocity) * 2, 10);
-    const adaptivePreload = Math.max(this.PRELOAD_AHEAD + velocityMultiplier, 25);
+    // 🚨 THROTTLING: Prevent rapid-fire preload triggers that cause overflow
+    const now = Date.now();
+    if (now - this.lastPreloadTime < this.PRELOAD_THROTTLE_MS) {
+      console.log('[PRELOAD] 🚫 Throttled - too soon since last preload');
+      return;
+    }
+
+    // 🚨 QUEUE PROTECTION: Don't add more jobs if queue is getting full (BALANCED)
+    if (this.jobQueue.length > this.EMERGENCY_MAX_QUEUE_SIZE * 0.8) { // Increased to 80% - less restrictive
+      console.log('[PRELOAD] 🚫 Skipped - queue too full:', this.jobQueue.length);
+      return;
+    }
+
+    this.lastPreloadTime = now;
+
+    // Calculate adaptive preload distance based on scroll velocity (REDUCED)
+    const velocityMultiplier = Math.min(Math.abs(this.scrollVelocity) * 1.5, 8); // Reduced from 2, 10
+    const adaptivePreload = Math.max(this.PRELOAD_AHEAD + velocityMultiplier, 15); // Reduced from 25
 
     const jobs: Omit<LoadingJob, 'retries' | 'timestamp'>[] = [];
 
-    // Preload ahead
-    const preloadStart = this.scrollDirection === 'down' ? currentIndex + 3 : Math.max(0, currentIndex - adaptivePreload);
-    const preloadEnd = this.scrollDirection === 'down' ? currentIndex + adaptivePreload : currentIndex - 3;
+    // Preload ahead (REDUCED RANGE)
+    const preloadStart = this.scrollDirection === 'down' ? currentIndex + 2 : Math.max(0, currentIndex - adaptivePreload);
+    const preloadEnd = this.scrollDirection === 'down' ? currentIndex + Math.min(adaptivePreload, 15) : currentIndex - 2; // Capped at 15
 
     for (let pos = preloadStart; pos <= preloadEnd; pos++) {
-      if (pos >= 0 && !this.imageCache.has(pos)) {
+      if (pos >= 0 && !this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
         jobs.push({
-          id: `preload_${pos}`,
+          id: `preload_${pos}_${now}`,
           prompt: this.getPromptForPosition(pos),
-          priority: pos <= currentIndex + 5 ? 'critical' : 'preload',
+          priority: pos <= currentIndex + 3 ? 'critical' : 'preload', // Reduced critical range from 5 to 3
           position: pos
         });
+
+        // 🚨 HARD LIMIT: Max 12 jobs per preload trigger (balanced for responsiveness)
+        if (jobs.length >= 12) break;
       }
     }
 
-    // Cache behind (lower priority)
-    for (let pos = Math.max(0, currentIndex - this.CACHE_BEHIND); pos < currentIndex; pos++) {
-      if (!this.imageCache.has(pos)) {
+    // Cache behind (REDUCED RANGE, lower priority)
+    const maxBehindJobs = Math.max(0, 5 - jobs.length); // Max 5 behind jobs, and only if we have room
+    for (let pos = Math.max(0, currentIndex - Math.min(this.CACHE_BEHIND, 5)); pos < currentIndex && jobs.length < maxBehindJobs + 8; pos++) {
+      if (!this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
         jobs.push({
-          id: `cache_${pos}`,
+          id: `cache_${pos}_${now}`,
           prompt: this.getPromptForPosition(pos),
           priority: 'cache',
           position: pos
@@ -406,13 +448,13 @@ export class FeedLoadingService {
     }
 
     if (jobs.length > 0) {
-      console.log('[PRELOAD] 🧠 Scheduling', jobs.length, 'intelligent preload jobs');
+      console.log('[PRELOAD] 🧠 Scheduling', jobs.length, 'intelligent preload jobs (throttled)');
       this.queueJobs(jobs, this.userImageBase64);
     }
 
-    // Trigger continuous generation check
+    // Trigger continuous generation check (LESS FREQUENT)
     if (this.continuousGenerationEnabled) {
-      setTimeout(() => this.maintainBuffer(), 1000);
+      setTimeout(() => this.maintainBuffer(), 2000); // Increased from 1000ms to 2000ms
     }
   }
 
@@ -637,20 +679,27 @@ export class FeedLoadingService {
   }
 
   /**
-   * 🚨 ULTRATHINK: Fixed buffer batch generation with intelligent gap-filling
+   * 🚨 ULTRATHINK: Fixed buffer batch generation with intelligent gap-filling + OVERFLOW PROTECTION
    */
   private generateBufferBatch() {
     if (!this.userImageBase64) return;
 
+    // 🚨 ADDITIONAL QUEUE PROTECTION: Skip if queue is getting full (BALANCED)
+    if (this.jobQueue.length > this.EMERGENCY_MAX_QUEUE_SIZE * 0.85) { // Increased to 85% - less restrictive
+      console.log('[BUFFER] 🚫 Skipped buffer generation - queue too full:', this.jobQueue.length);
+      return;
+    }
+
     const jobs = [];
 
-    // 🚨 PRIORITY: Fill gaps near user first, then generate ahead
+    // 🚨 PRIORITY: Fill gaps near user first, then generate ahead (REDUCED SCOPE)
     const userPosition = this.lastScrollPosition;
-    const scanStart = Math.max(0, userPosition - 5); // Check behind user too
-    const scanEnd = userPosition + this.BUFFER_TARGET; // Reasonable ahead limit
+    // 🚨 CRITICAL FIX: Skip positions 0 and 1 - they're reserved for mock images
+    const scanStart = Math.max(2, userPosition - 3); // Start from position 2 to preserve mock images
+    const scanEnd = userPosition + Math.min(this.BUFFER_TARGET, 20); // Capped at 20
 
-    // First pass: Fill critical gaps near user (high priority)
-    for (let pos = scanStart; pos <= userPosition + 20; pos++) {
+    // First pass: Fill critical gaps near user (STRICTER LIMITS)
+    for (let pos = scanStart; pos <= userPosition + 10; pos++) { // Reduced from 20
       if (!this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
         const uniqueId = `critical_gap_${pos}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const prompt = this.getPromptForPosition(pos);
@@ -664,16 +713,16 @@ export class FeedLoadingService {
 
         console.log(`[BUFFER] 🚨 Queuing critical gap at position ${pos}`);
 
-        // Limit critical jobs to prevent overflow
-        if (jobs.length >= 10) break;
+        // Much stricter limit to prevent overflow
+        if (jobs.length >= 5) break; // Reduced from 10
       }
     }
 
-    // Second pass: Generate ahead (lower priority, fewer jobs)
-    if (jobs.length < 3) { // Reduced from 5 - stricter limit on critical jobs
+    // Second pass: Generate ahead (MUCH SMALLER, lower priority)
+    if (jobs.length < 2) { // Reduced from 3
       const currentMax = Math.max(...Array.from(this.imageCache.keys()), userPosition);
-      const aheadStart = Math.max(currentMax + 1, userPosition + 5); // Reduced from 10
-      const aheadEnd = Math.min(aheadStart + 5, scanEnd); // Reduced from 10 - much smaller ahead generation
+      const aheadStart = Math.max(currentMax + 1, userPosition + 3); // Reduced from 5
+      const aheadEnd = Math.min(aheadStart + 3, scanEnd); // Reduced from 5 - tiny ahead generation
 
       for (let pos = aheadStart; pos <= aheadEnd; pos++) {
         if (!this.imageCache.has(pos) && !this.isPositionInQueue(pos)) {
@@ -689,14 +738,14 @@ export class FeedLoadingService {
 
           console.log(`[BUFFER] 📦 Queuing ahead position ${pos}`);
 
-          // Limit total jobs to prevent queue overflow
-          if (jobs.length >= 8) break; // Reduced from 15
+          // Very strict total limit to prevent queue overflow
+          if (jobs.length >= 5) break; // Reduced from 8
         }
       }
     }
 
     if (jobs.length > 0) {
-      console.log('[LOADING] 🚀 Generating controlled buffer batch:', jobs.length, 'images (gaps + ahead)');
+      console.log('[LOADING] 🚀 Generating controlled buffer batch:', jobs.length, 'images (gaps + ahead) - OVERFLOW PROTECTED');
       this.queueJobs(jobs, this.userImageBase64);
 
       // Update maxGenerated more conservatively

@@ -33,6 +33,18 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
 
+  // Safety check for entry prop
+  if (!entry) {
+    console.error('[FEEDCARD] Entry prop is undefined or null');
+    return (
+      <View style={styles.container}>
+        <View style={styles.imageFallback}>
+          <Text style={styles.fallbackText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   // 🚨 CRITICAL: Final safety check for image URL to prevent React Native crashes
   const fallbackImageUrl = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%23ff6b6b%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EImage%20Error%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EFallback%20Display%3C/text%3E%3C/svg%3E';
 
@@ -235,9 +247,9 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
 
       {/* Outfit info */}
       <View style={styles.infoContainer}>
-        <Text style={styles.styleText}>{entry.metadata.style}</Text>
-        <Text style={styles.occasionText}>{entry.metadata.occasion}</Text>
-        
+        <Text style={styles.styleText}>{entry.metadata?.style || entry.prompt || 'Trending Style'}</Text>
+        <Text style={styles.occasionText}>{entry.metadata?.occasion || 'Perfect for any occasion'}</Text>
+
         <TouchableOpacity
           style={styles.shopButton}
           onPress={handleShop}
