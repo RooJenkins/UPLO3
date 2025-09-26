@@ -189,7 +189,7 @@ export function FeedCard({ entry, isActive }: FeedCardProps) {
           <View style={styles.imageFallback}>
             <Text style={styles.fallbackText}>Image Error</Text>
             <Text style={styles.fallbackSubtext}>{entry.prompt}</Text>
-            <Text style={styles.fallbackUrl}>URL: {entry.imageUrl.substring(0, 60)}...</Text>
+            <Text style={styles.fallbackUrl}>URL: {entry.imageUrl?.substring(0, 60) || 'undefined'}...</Text>
           </View>
         )}
         

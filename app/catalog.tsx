@@ -455,28 +455,35 @@ const CatalogScreen = () => {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {trendingData.data.map((product: any) => (
-              <TouchableOpacity
-                key={product.id}
-                className="mr-3 w-32"
-                onPress={() => router.push({
-                  pathname: '/product-detail',
-                  params: { productId: product.id }
-                })}
-              >
-                <Image
-                  source={{ uri: product.mainImage }}
-                  className="w-32 h-40 rounded-lg"
-                  contentFit="cover"
-                />
-                <Text className="text-xs text-gray-500 mt-2" numberOfLines={1}>
-                  {product.brand.name}
-                </Text>
-                <Text className="font-medium text-gray-900" numberOfLines={2}>
-                  {product.name}
-                </Text>
-                <Text className="text-sm font-bold text-gray-900 mt-1">
-                  {formatPrice(product.base_price)}
+            {trendingData.data.map((product: any) => {
+              // 🚨 ULTRATHINK: Validate trending product image URL to prevent runtime crashes
+              const trendingImageUrl = product.mainImage || product.images?.[0]?.original_url || '';
+              const safeTrendingImageUrl = (!trendingImageUrl || trendingImageUrl === 'null' || trendingImageUrl === 'undefined' || trendingImageUrl.trim() === '')
+                ? 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%234ecdc4%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3ETrending%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EProduct%3C/text%3E%3C/svg%3E'
+                : trendingImageUrl;
+
+              return (
+                <TouchableOpacity
+                  key={product.id}
+                  className="mr-3 w-32"
+                  onPress={() => router.push({
+                    pathname: '/product-detail',
+                    params: { productId: product.id }
+                  })}
+                >
+                  <Image
+                    source={{ uri: safeTrendingImageUrl }}
+                    className="w-32 h-40 rounded-lg"
+                    contentFit="cover"
+                  />
+                  <Text className="text-xs text-gray-500 mt-2" numberOfLines={1}>
+                    {product.brand?.name || 'Unknown Brand'}
+                  </Text>
+                  <Text className="font-medium text-gray-900" numberOfLines={2}>
+                    {product.name || 'Product Name'}
+                  </Text>
+                  <Text className="text-sm font-bold text-gray-900 mt-1">
+                    {formatPrice(product.base_price || product.basePrice || 0)}
                 </Text>
               </TouchableOpacity>
             ))}

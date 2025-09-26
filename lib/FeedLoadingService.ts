@@ -31,6 +31,9 @@ export class FeedLoadingService {
   private workers: Set<string> = new Set();
   private jobQueue: LoadingJob[] = [];
   private processing: Map<string, LoadingJob> = new Map();
+  // 🚨 ULTRATHINK: Enhanced deduplication tracking
+  private processingPositions: Set<number> = new Set(); // Track positions being processed
+  private positionLocks: Map<number, string> = new Map(); // Track which worker owns which position
   private imageCache: Map<number, GeneratedImage> = new Map();
   private preloadedImages: Set<string> = new Set();
   private workerStats: Map<string, WorkerStats> = new Map();
@@ -129,12 +132,48 @@ export class FeedLoadingService {
       }
     }
 
-    const newJobs: LoadingJob[] = jobs.map(job => ({
-      ...job,
-      userImageBase64,
-      retries: 0,
-      timestamp: Date.now()
-    }));
+    // 🚨 ULTRATHINK: Enhanced atomic position deduplication with worker-level tracking
+    const filteredJobs = jobs.filter(job => {
+      // Skip if position already cached
+      if (this.imageCache.has(job.position)) {
+        console.log(`[DEDUP] ⏭️ Skipping position ${job.position} - already cached`);
+        return false;
+      }
+
+      // Skip if position is being processed by any worker
+      if (this.processingPositions.has(job.position)) {
+        const lockingWorker = this.positionLocks.get(job.position);
+        console.log(`[DEDUP] ⏭️ Skipping position ${job.position} - being processed by ${lockingWorker || 'unknown worker'}`);
+        return false;
+      }
+
+      // Skip if position already in queue (fallback check)
+      if (this.isPositionInQueue(job.position)) {
+        console.log(`[DEDUP] ⏭️ Skipping position ${job.position} - already queued`);
+        return false;
+      }
+
+      return true;
+    });
+
+    if (filteredJobs.length === 0) {
+      console.log('[LOADING] ⏭️ All jobs skipped - positions already cached/queued/processing');
+      return;
+    }
+
+    // 🚨 ULTRATHINK: Enhanced job ID generation with position tracking
+    const newJobs: LoadingJob[] = filteredJobs.map((job, index) => {
+      const timestamp = Date.now();
+      const uniqueId = this.generateEnhancedJobId(job.position, job.priority, timestamp, index);
+
+      return {
+        ...job,
+        id: uniqueId,
+        userImageBase64,
+        retries: 0,
+        timestamp
+      };
+    });
 
     // Sort by priority: critical > preload > cache
     const priorityOrder = { critical: 0, preload: 1, cache: 2 };
@@ -150,6 +189,23 @@ export class FeedLoadingService {
 
     // Start processing
     this.processQueue();
+  }
+
+  /**
+   * 🚨 ULTRATHINK: Enhanced job ID generation with position and worker tracking
+   */
+  private generateEnhancedJobId(position: number, priority: 'critical' | 'preload' | 'cache', timestamp: number, batchIndex: number): string {
+    // Create ultra-unique ID with multiple entropy sources
+    const sessionId = Math.random().toString(36).substring(2, 10); // 8 chars
+    const processId = Math.floor(Math.random() * 10000); // 4 digits
+    const microTime = performance.now().toString().replace('.', ''); // High-precision timing
+    const positionHash = ((position * 37) + (batchIndex * 13)) % 10000; // Position-based uniqueness
+
+    // Format: priority_position_timestamp_session_process_micro_hash
+    const jobId = `${priority.charAt(0)}${position}_${timestamp}_${sessionId}_${processId}_${microTime.substring(0, 10)}_${positionHash}`;
+
+    console.log(`[DEDUP] 🆔 Generated enhanced job ID: ${jobId.substring(0, 30)}... for position ${position}`);
+    return jobId;
   }
 
   /**
@@ -197,18 +253,30 @@ export class FeedLoadingService {
   }
 
   /**
-   * Assign a job to a specific worker
+   * 🚨 ULTRATHINK: Enhanced worker assignment with position locking
    */
   private async assignJobToWorker(job: LoadingJob, workerId: string) {
     const stats = this.workerStats.get(workerId)!;
+
+    // 🚨 CRITICAL: Lock position before processing to prevent race conditions
+    if (this.processingPositions.has(job.position)) {
+      const existingWorker = this.positionLocks.get(job.position);
+      console.warn(`[DEDUP] ⚠️ Race condition detected! Position ${job.position} already locked by ${existingWorker}, abandoning job ${job.id}`);
+      return; // Abandon this job - another worker got there first
+    }
+
+    // Acquire position lock
+    this.processingPositions.add(job.position);
+    this.positionLocks.set(job.position, workerId);
+
     stats.busy = true;
     this.processing.set(job.id, job);
 
     const startTime = Date.now();
 
-    try {
-      console.log(`[WORKER-${workerId}] Processing job ${job.id} (${job.priority})`);
+    console.log(`[WORKER-${workerId}] 🔒 Locked position ${job.position} and processing job ${job.id.substring(0, 20)}... (${job.priority})`);
 
+    try {
       const result = await this.generateImage(job);
 
       // 🚨 ULTRATHINK: Atomic position check and cache to prevent race conditions
@@ -270,8 +338,14 @@ export class FeedLoadingService {
         console.error(`[WORKER-${workerId}] Max retries exceeded for job ${job.id}`);
       }
     } finally {
+      // 🚨 ULTRATHINK: Release position lock when worker finishes (success or failure)
+      this.processingPositions.delete(job.position);
+      this.positionLocks.delete(job.position);
+
       stats.busy = false;
       this.processing.delete(job.id);
+
+      console.log(`[WORKER-${workerId}] 🔓 Released position lock ${job.position} and completed job ${job.id.substring(0, 20)}...`);
 
       // Clean up cache if needed
       this.cleanupCache();
@@ -757,11 +831,16 @@ export class FeedLoadingService {
   }
 
   /**
-   * Check if a position is already being processed in the job queue
+   * 🚨 ULTRATHINK: Enhanced position checking with fast lookup
    */
   private isPositionInQueue(position: number): boolean {
-    return this.jobQueue.some(job => job.position === position) ||
-           Array.from(this.processing.values()).some(job => job.position === position);
+    // Fast check using position tracking sets
+    if (this.processingPositions.has(position)) {
+      return true; // Position is being processed
+    }
+
+    // Fallback: check job queue (should be rare due to enhanced filtering)
+    return this.jobQueue.some(job => job.position === position);
   }
 
   /**
@@ -780,16 +859,20 @@ export class FeedLoadingService {
   }
 
   /**
-   * Clear all caches and reset service state
+   * 🚨 ULTRATHINK: Enhanced cache clearing with deduplication tracking reset
    */
   clearAllCaches() {
-    console.log('[LOADING] 🧼 Clearing all caches and resetting state');
+    console.log('[LOADING] 🧼 Clearing all caches and resetting deduplication state');
 
     // Clear all caches
     this.imageCache.clear();
     this.preloadedImages.clear();
     this.jobQueue.length = 0;
     this.processing.clear();
+
+    // 🚨 ULTRATHINK: Clear enhanced deduplication tracking
+    this.processingPositions.clear();
+    this.positionLocks.clear();
 
     // Reset state
     this.maxGeneratedPosition = 0;
@@ -805,11 +888,11 @@ export class FeedLoadingService {
       stat.avgDuration = 0;
     });
 
-    console.log('[LOADING] ✨ Cache cleared, ready for fresh generation');
+    console.log('[LOADING] ✨ Cache and deduplication system cleared, ready for fresh generation');
   }
 
   /**
-   * Get cache statistics with enhanced buffer info
+   * 🚨 ULTRATHINK: Enhanced cache stats with deduplication tracking
    */
   getCacheStats() {
     const busyWorkers = Array.from(this.workerStats.values()).filter(w => w.busy).length;
@@ -829,6 +912,11 @@ export class FeedLoadingService {
       distanceFromEnd,
       maxGeneratedPosition: this.maxGeneratedPosition,
       continuousEnabled: this.continuousGenerationEnabled,
+      // 🚨 ULTRATHINK: Deduplication system stats
+      positionsProcessing: this.processingPositions.size,
+      positionLocksActive: this.positionLocks.size,
+      lockedPositions: Array.from(this.processingPositions),
+      workerPositions: Object.fromEntries(this.positionLocks),
       // Debug info
       cacheKeys: Array.from(this.imageCache.keys()),
       processingIds: Array.from(this.processing.keys())

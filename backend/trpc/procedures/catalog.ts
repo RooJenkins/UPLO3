@@ -12,9 +12,16 @@ const isNodeEnvironment = !isReactNative && !isBrowser && typeof process !== 'un
 if (isNodeEnvironment) {
   try {
     ({ getDatabaseService, getSyncManager } = require('../../database'));
-    ({ getSupportedBrands } = require('../../scraper/adapters'));
   } catch (error) {
-    // Database modules not available, use fallbacks
+    console.warn('[CATALOG] Database modules not available, using fallbacks');
+  }
+
+  // Separate try-catch for scraper to prevent backend crashes
+  try {
+    ({ getSupportedBrands } = require('../../scraper/adapters'));
+  } catch (scraperError) {
+    console.warn('[CATALOG] Scraper modules not available, using fallbacks:', scraperError?.message);
+    // getSupportedBrands fallback is set below
   }
 }
 

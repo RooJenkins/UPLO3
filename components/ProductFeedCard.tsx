@@ -115,7 +115,7 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
       // Convert product to feed entry format for favorites
       const feedEntry = {
         id: entry.id,
-        imageUrl: product.mainImage,
+        imageUrl: safeProductImageUrl, // 🚨 ULTRATHINK: Use validated image URL for favorites
         prompt: `${product.brand.name} ${product.name}`,
         outfitId: `product_${product.id}`,
         items: [{
