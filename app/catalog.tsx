@@ -484,9 +484,10 @@ const CatalogScreen = () => {
                   </Text>
                   <Text className="text-sm font-bold text-gray-900 mt-1">
                     {formatPrice(product.base_price || product.basePrice || 0)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
