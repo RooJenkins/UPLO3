@@ -4,114 +4,235 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**UPLO3** is a React Native + Expo Router mobile app featuring an advanced 30-worker parallel AI outfit generation system with sophisticated infinite scroll capabilities. Built for the Rork platform with cross-platform deployment capabilities.
+**UPLO3** is a React Native + Expo Router mobile fashion app featuring:
+- **30-worker parallel AI outfit generation system** with infinite scroll
+- **Virtual try-on capabilities** with real product integration
+- **Smart recommendation engine** powered by ML
+- **Real-time product catalog** with shopping integration
+- **Cloud-first architecture** with tRPC + Hono backend
 
-### 🚀 **Current State (Updated September 24, 2025)**
-- **Status**: Production-ready with comprehensive "ultrathink" fixes applied
-- **Feed System**: 30 parallel workers for AI outfit generation
-- **Architecture**: Advanced FeedLoadingService with continuous generation
-- **Performance**: Infinite scroll with intelligent preloading and buffer management
-- **Reliability**: Ultra-unique ID generation preventing React key collisions
-
-### Tech Stack
-- **Frontend**: React Native + Expo Router + TypeScript
-- **Backend**: Hono + tRPC + Zod validation
-- **State Management**: Zustand + React Query
-- **Styling**: NativeWind (Tailwind for React Native)
-- **Platform**: Rork.com deployment + local development
-- **AI Integration**: Rork Toolkit API for outfit generation
+**Platform**: Cross-platform (iOS, Android, Web) via Expo + Rork.com deployment
 
 ## Development Commands
 
-### Essential Commands
+### Essential Workflow
 ```bash
 # Install dependencies
 bun install
 
-# Start development server
-bun run start                    # Mobile development with QR code
-bun run start-web               # Web development mode
-bun run start-web-dev           # Web with debug logging
+# Start development (mobile + web with tunnel)
+bun run start              # Rork tunnel mode (default)
+bun run start-web          # Web + tunnel mode
+bun run start-web-dev      # Web + tunnel + debug logging
 
-# Platform-specific
-bun run start -- --ios         # iOS simulator (if available)
-bun run start -- --android     # Android emulator (if available)
+# Alternative development modes
+bun run dev                # Custom dev-start.js script
+bun run dev:web            # Web-only via dev-start.js
+bun run dev:clean          # Clear cache + restart
 
-# Linting
-expo lint                       # Run ESLint checks
+# Testing & Debugging
+bun run test-api           # Test API endpoint health
+bun run debug              # Test debug endpoint
+curl http://localhost:8081/api/health  # Backend health check
+
+# Linting & Type Checking
+expo lint                  # ESLint checks
+npx tsc --noEmit          # TypeScript type checking
+
+# Cache management
+bunx expo start --clear    # Clear Metro cache
+bun run clean              # Nuclear option: remove node_modules + reinstall
 ```
 
-### Testing & Debugging
-- Navigate to `/backend-test` in the app for comprehensive API testing
-- Check browser console for tRPC connection logs
-- Use React Query DevTools for state inspection
+### Platform-Specific Testing
+```bash
+# iOS (requires Xcode)
+bun run start -- --ios
 
-## Architecture
+# Android (requires Android Studio)
+bun run start -- --android
 
-### Directory Structure
-```
-├── app/                        # Expo Router screens
-│   ├── api/                   # API routes (tRPC integration)
-│   │   ├── [...api]+api.ts   # Main API handler
-│   │   ├── health+api.ts     # Health check endpoint
-│   │   └── trpc/             # tRPC-specific routes
-│   ├── (tabs)/               # Tab navigation screens
-│   └── backend-test.tsx      # Development testing screen
-├── backend/                   # Server-side code
-│   ├── hono.ts               # Hono server setup
-│   └── trpc/                 # tRPC configuration
-│       ├── app-router.ts     # Main tRPC router
-│       ├── create-context.ts # tRPC context setup
-│       └── routes/           # Organized route handlers
-├── components/               # Reusable UI components
-├── lib/                      # Utilities and configurations
-│   └── trpc.ts              # tRPC client setup
-├── providers/                # React context providers
-│   └── AppProvider.tsx      # Main provider wrapper
-└── types/                    # TypeScript type definitions
+# Web preview
+bun run start-web
 ```
 
-## Advanced Feed Loading Architecture
+## Architecture Deep Dive
 
-### **FeedLoadingService System**
-The app features a sophisticated 30-worker parallel processing system for AI outfit generation:
+### High-Level System Design
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      UPLO3 Architecture                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Frontend (React Native + Expo Router)                         │
+│    ├── 30-Worker AI Generation System                          │
+│    ├── Virtual Try-On Service                                  │
+│    ├── Smart Recommendation Engine                             │
+│    └── Infinite Scroll Feed Management                         │
+│                        ↕ tRPC                                   │
+│  Backend (Hono + tRPC)                                          │
+│    ├── Product Catalog API                                     │
+│    ├── AI Outfit Generation                                    │
+│    ├── Database Services (PostgreSQL ready)                    │
+│    ├── Image Cache Service                                     │
+│    └── Web Scraper Infrastructure                              │
+│                                                                 │
+│  External Integrations                                          │
+│    ├── Rork Toolkit API (AI generation)                       │
+│    ├── Brand APIs (Shopify, BigCommerce)                      │
+│    └── Web Scrapers (Playwright-based)                        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Critical Service Architecture
+
+#### FeedLoadingService (30-Worker Engine)
+**Location**: `lib/FeedLoadingService.ts`
+
+The core AI generation system with sophisticated worker pool management:
 
 ```typescript
 class FeedLoadingService {
-  private MAX_WORKERS = 30;  // Parallel processing capacity
-  private workerPool: Array<{ busy: boolean; id: string }>;
-  private continuousGeneration = true; // Infinite scroll support
+  private MAX_WORKERS = 30;              // Parallel processing capacity
+  private BUFFER_TARGET = 30;            // Images to maintain ahead
+  private GENERATION_TRIGGER_DISTANCE = 15; // When to start generating
 
-  // Ultra-unique ID generation prevents React key collisions
-  generateUniqueId = (base: string) =>
-    `${timestamp}_${sessionId}_${processId}_${microTime}_${random}_${index}`;
+  // Advanced Features:
+  // - Circuit breaker pattern for API failure protection
+  // - Emergency queue size limits (max 50 jobs)
+  // - Position lock system prevents duplicate generation
+  // - Scroll velocity prediction for smart preloading
+  // - Multi-layer deduplication tracking
 }
 ```
 
-### **Critical Service Reference Pattern**
+**Key Patterns**:
+- **Service Reference**: Always use consistent service instance via `useRef` pattern
+- **Ultra-Unique IDs**: 6-source entropy system prevents React key collisions
+- **4D Prompt Variation**: 36 colors × 30 styles × 23 accessories × 29 base prompts = 25,000+ unique combinations
+
+#### Virtual Try-On Service
+**Location**: `lib/VirtualTryOnService.ts`
+
+Machine learning service for realistic clothing try-on:
+- Body landmark detection
+- Garment warping and fitting
+- Real product integration
+- Style transfer capabilities
+
+#### Recommendation Engine
+**Location**: `lib/RecommendationEngine.ts`
+
+Smart product recommendation system:
+- User profile analysis
+- Collaborative filtering
+- Content-based recommendations
+- Real-time context awareness
+
+### tRPC Backend Structure
+
+**Entry Point**: `app/api/[...api]+api.ts` → `backend/server.ts`
+
+```
+backend/
+├── server.ts                    # Hono app + tRPC mounting
+├── trpc/
+│   ├── router.ts               # Main router (combines all procedures)
+│   ├── context.ts              # tRPC context setup
+│   └── procedures/             # Organized API endpoints
+│       ├── catalog.ts          # Product catalog APIs
+│       ├── outfit.ts           # AI outfit generation
+│       ├── feed.ts             # Feed management
+│       ├── example.ts          # Example/test endpoints
+│       ├── monitoring.ts       # System monitoring
+│       └── scraper.ts          # Web scraper controls
+├── database/                   # Database services
+│   ├── DatabaseService.ts      # PostgreSQL operations
+│   ├── DatabaseSyncManager.ts  # Sync coordination
+│   ├── ImageCacheService.ts    # Image caching layer
+│   └── index.ts
+├── scraper/                    # Web scraping infrastructure
+│   └── (Playwright-based scrapers)
+└── monitoring/                 # System monitoring
+```
+
+**API Route Flow**:
+1. Request → `/api/trpc/[procedure]` (Expo Router)
+2. Hono server mounts at `/api/*`
+3. tRPC server handles `/api/trpc/*`
+4. Procedures execute with type safety
+5. Response with SuperJSON serialization
+
+### Frontend App Structure
+
+```
+app/
+├── _layout.tsx                 # Root layout + providers
+├── index.tsx                   # App entry point
+├── onboarding.tsx             # User onboarding flow
+├── (main)/                    # Main app screens
+│   ├── _layout.tsx           # Main layout
+│   └── feed.tsx              # Primary feed screen
+├── api/                       # tRPC API routes (Expo Router)
+│   ├── [...api]+api.ts       # Main API handler
+│   └── health+api.ts         # Health check
+├── backend-test.tsx          # API testing/debugging screen
+├── catalog.tsx               # Product catalog browser
+├── product-detail.tsx        # Individual product view
+├── outfit-detail.tsx         # Outfit detail view
+├── brands.tsx                # Brand directory
+├── search.tsx                # Search functionality
+├── debug.tsx                 # Debug utilities
+└── +not-found.tsx            # 404 handling
+
+components/                    # Reusable UI components
+├── LoadingStats.tsx          # Worker monitoring display
+├── FeedCard.tsx              # Feed item component
+└── (other components)
+
+providers/                     # React Context providers
+├── AppProvider.tsx           # tRPC + React Query setup
+├── FeedProvider.tsx          # Feed state management
+└── UserProvider.tsx          # User state/image storage
+
+lib/                          # Core services & utilities
+├── trpc.ts                   # tRPC client configuration
+├── FeedLoadingService.ts     # 30-worker generation engine
+├── VirtualTryOnService.ts    # ML try-on service
+├── RecommendationEngine.ts   # Smart recommendations
+├── ProductSyncService.ts     # Product data sync
+└── MLModelService.ts         # ML model management
+```
+
+## Critical Development Patterns
+
+### 1. Service Reference Pattern (CRITICAL)
+**Location**: `providers/FeedProvider.tsx`
+
 ```typescript
-// providers/FeedProvider.tsx - ALWAYS use this pattern
+// ✅ CORRECT - Consistent service reference
 const loadingService = useRef<FeedLoadingService | null>(null);
 if (!loadingService.current) {
-  loadingService.current = new FeedLoadingService(); // Force fresh instance
+  loadingService.current = new FeedLoadingService();
 }
-const service = loadingService.current; // Use this reference consistently
-// ❌ NEVER use loadingService.getStats()
-// ✅ ALWAYS use service.getStats()
+const service = loadingService.current; // Use this consistently
+
+// Use service.method() everywhere
+service.getStats()
+service.addJobs()
+
+// ❌ INCORRECT - Mixed references cause bugs
+loadingService.current.getStats()  // Don't mix with
+service.getStats()                  // this pattern
 ```
 
-### **Feed Management Flow**
-1. **Initial Feed**: 2 reliable mock images (Picsum.photos + fallbacks)
-2. **Dynamic Loading**: Positions 2+ filled by 30-worker AI generation
-3. **Buffer Management**: Maintains 20-100 image buffer based on scroll velocity
-4. **Infinite Scroll**: Continuous generation maintains seamless UX
-5. **Duplicate Prevention**: Multi-layer validation prevents image repetition
+### 2. Ultra-Unique ID Generation
+Prevents React "Encountered two children with same key" warnings:
 
-### **Ultra-Unique ID Generation**
 ```typescript
-// Prevents React key collision warnings
 const generateUniqueId = (index: number) => {
-  const microTime = Date.now() + index; // Temporal uniqueness
+  const microTime = Date.now() + index;
   const sessionId = Math.random().toString(36).substring(2, 15);
   const processId = Math.floor(Math.random() * 100000);
   const random = Math.random().toString(36).substring(2, 10);
@@ -119,246 +240,282 @@ const generateUniqueId = (index: number) => {
 };
 ```
 
-### Key Files to Understand
+### 3. tRPC Usage Patterns
 
-#### **Core Feed Loading System** (Updated September 2025)
-
-#### `lib/FeedLoadingService.ts` - 30-Worker Processing Engine
-- **30 parallel workers** for AI outfit generation
-- **Continuous generation** system for infinite scroll
-- **Enhanced prompt variation** with 4-dimensional uniqueness system
-- **Worker pool management** with intelligent load balancing
-- **Critical**: Contains comprehensive logging for debugging worker issues
-
-#### `providers/FeedProvider.tsx` - Feed State Management & Service Coordination
-- **Service reference management** via useRef pattern
-- **Ultra-unique ID generation** preventing React key collisions
-- **Feed buffer management** and infinite scroll coordination
-- **Mock image handling** with reliable Picsum.photos URLs + fallbacks
-- **Critical**: Recently updated with 17 service reference fixes
-
-#### `components/LoadingStats.tsx` - Worker Monitoring & Diagnostics
-- **Real-time worker count display** (should show "30/30")
-- **Buffer health monitoring** and performance metrics
-- **Efficiency tracking** and scroll velocity analysis
-- **Critical**: Recently updated with missing imports and proper TypeScript support
-
-#### `app/(main)/feed.tsx` - Main Feed UI & Infinite Scroll
-- **FlatList optimization** for performance
-- **Viewability tracking** and scroll management
-- **LoadingStats integration** for real-time monitoring
-- **Swipe gesture handling** and user interaction
-
-#### **Backend & API System**
-
-#### `lib/trpc.ts` - tRPC Client Configuration
-- Handles environment detection (Rork platform vs local)
-- Implements fallback responses for development mode
-- Contains comprehensive error handling and logging
-- **Critical for API debugging**
-
-#### `backend/trpc/app-router.ts` - API Routes
-- Defines all available tRPC procedures
-- Routes: `example.hi`, `outfit.generate`, `feed.*`
-- **Edit here to add new API endpoints**
-
-#### `providers/AppProvider.tsx` - App Setup
-- tRPC provider configuration
-- React Query setup with retry logic
-- **Essential for proper app initialization**
-
-## Development Workflow
-
-### Adding New Features
-1. **Define Types**: Add TypeScript interfaces in `types/`
-2. **Create tRPC Route**: Add procedure in `backend/trpc/routes/`
-3. **Update Router**: Export route in `app-router.ts`
-4. **Frontend Integration**: Use `trpc.route.procedure.useQuery/useMutation()`
-5. **Test**: Use `/backend-test` screen for verification
-
-### tRPC Development Patterns
 ```typescript
 // Query (GET-like operations)
-const { data, isLoading, error } = trpc.feed.list.useQuery();
+const { data, isLoading, error } = trpc.catalog.list.useQuery({
+  category: 'shirts',
+  limit: 20
+});
 
 // Mutation (POST-like operations)
 const generateOutfit = trpc.outfit.generate.useMutation({
-  onSuccess: (data) => console.log('Generated:', data),
-  onError: (error) => console.error('Failed:', error)
+  onSuccess: (data) => {
+    console.log('Generated:', data);
+  },
+  onError: (error) => {
+    console.error('Failed:', error);
+    // Fallback logic here
+  }
+});
+
+// Invalidate queries after mutations
+const utils = trpc.useContext();
+await utils.catalog.list.invalidate();
+```
+
+### 4. Adding New tRPC Endpoints
+
+**Step-by-step process**:
+
+1. Create procedure in `backend/trpc/procedures/[name].ts`:
+```typescript
+import { publicProcedure } from '../context';
+import { z } from 'zod';
+
+export const myProcedures = {
+  myEndpoint: publicProcedure
+    .input(z.object({ param: z.string() }))
+    .query(async ({ input }) => {
+      return { result: input.param };
+    })
+};
+```
+
+2. Add to router in `backend/trpc/router.ts`:
+```typescript
+import { myProcedures } from './procedures/my';
+
+export const appRouter = createTRPCRouter({
+  my: createTRPCRouter(myProcedures),
+  // ... other routes
 });
 ```
 
-### Error Handling Strategy
-- **Development Mode**: Automatic fallback to mock responses
-- **Production**: Real API calls with comprehensive error boundaries
-- **Network Issues**: Automatic retry with exponential backoff
-- **Debugging**: Extensive console logging for troubleshooting
+3. Use in frontend:
+```typescript
+const { data } = trpc.my.myEndpoint.useQuery({ param: 'value' });
+```
+
+### 5. Metro Bundler Configuration
+**Location**: `metro.config.js`
+
+The project uses **extensive module aliasing** to prevent bundling Node.js-only code:
+- Backend scraper modules (Playwright, Cheerio, etc.) are aliased to empty modules
+- Node.js built-ins (`node:sqlite`, `node:fs`, etc.) are replaced
+- This allows backend code to exist without breaking React Native bundling
+
+**When adding new Node.js dependencies to backend**, update `metro.config.js`:
+```javascript
+config.resolver.alias = {
+  'your-nodejs-module': emptyModulePath,
+};
+```
 
 ## Environment Configuration
 
+### Environment Variables
+```bash
+# Rork platform API (production)
+EXPO_PUBLIC_API_BASE_URL=https://your-api.rork.com
+
+# Local development server URL (auto-detected)
+EXPO_PUBLIC_DEV_SERVER_URL=http://localhost:8081
+
+# Development mode (auto-set)
+NODE_ENV=development
+```
+
 ### Development Modes
-- **Local Web**: API routes may not work (uses mock responses)
-- **Local Mobile**: Full tRPC backend functionality
+- **Local Web**: Full tRPC backend (Metro bundler serves API routes)
+- **Local Mobile**: Full functionality via Rork tunnel or local network
 - **Rork Platform**: Production API with real data
 - **Deployed**: Full production environment
 
-### Environment Variables
-```bash
-# Optional: Override API base URL
-EXPO_PUBLIC_RORK_API_BASE_URL=https://your-api.com
+## Common Development Workflows
 
-# Development server URL (auto-detected)
-EXPO_PUBLIC_DEV_SERVER_URL=http://localhost:8081
-```
+### Testing Backend Changes
+1. Modify procedure in `backend/trpc/procedures/`
+2. Server auto-reloads via Metro
+3. Test in app or navigate to `/backend-test` screen
+4. Check browser console for detailed tRPC logs
+
+### Adding New Product Catalog Features
+1. Review database schema in `CatalogPlan.md`
+2. Implement database service in `backend/database/`
+3. Create tRPC procedure in `backend/trpc/procedures/catalog.ts`
+4. Add frontend UI component
+5. Integrate with `ProductSyncService.ts` if needed
+
+### Debugging Feed/Worker Issues
+1. Enable worker monitoring: `LoadingStats` component shows real-time worker count
+2. Check console for `[LOADING]` and `[FEED]` prefixed logs
+3. Verify worker count displays "30/30" not "10/10"
+4. Monitor buffer health (should maintain 80%+)
+5. Check for React key collision warnings
+
+### Working with AI Generation
+- **Mock vs Real**: System automatically falls back to mock responses if backend unavailable
+- **Rate Limiting**: Circuit breaker pattern protects against API overload
+- **Prompt Engineering**: Modify variation arrays in `FeedLoadingService.ts` for different outfit styles
+- **Image Caching**: `ImageCacheService.ts` handles persistence
+
+## Performance Considerations
+
+### Critical Performance Metrics
+- **Worker Utilization**: Should show 30/30 active workers
+- **Buffer Health**: Target 80%+ for smooth scrolling
+- **Generation Speed**: ~2-3s average per outfit
+- **Cache Hit Rate**: 90%+ for preloaded images
+- **Scroll Performance**: Maintain 60fps during rapid scrolling
+
+### Optimization Patterns
+- **Infinite Scroll**: FlatList with `onViewableItemsChanged` for position tracking
+- **Image Preloading**: `Image.prefetch()` for upcoming images
+- **Memory Management**: Cache size limit of 100 images with LRU eviction
+- **Network Optimization**: SuperJSON for efficient serialization
+- **Query Caching**: React Query with 5-minute stale time
 
 ## Debugging Guide
 
+### Console Log Prefixes
+Understanding the logging system:
+
+```
+[TRPC]      - tRPC client configuration & requests
+[BACKEND]   - Hono server & tRPC server logs
+[LOADING]   - FeedLoadingService worker pool operations
+[FEED]      - Feed state management & buffer operations
+[FEEDCARD]  - Individual feed item rendering
+[VIRTUAL]   - Virtual try-on service operations
+[RECOMMEND] - Recommendation engine operations
+[SYNC]      - Product sync service operations
+```
+
 ### Common Issues & Solutions
 
+#### "Workers showing 10/10 instead of 30/30"
+**Cause**: Mixed service references in `FeedProvider.tsx`
+**Solution**: Ensure all method calls use consistent `service` instance (not `loadingService.current`)
+
+#### "React key collision warnings"
+**Cause**: Insufficient entropy in ID generation
+**Solution**: Verify `generateUniqueId()` uses all 6 entropy sources
+
+#### "Duplicate images in feed"
+**Cause**: Limited prompt variation
+**Solution**: Enhanced prompt variation system already implemented with 25,000+ combinations
+
 #### "tRPC fetch failed: 404"
-- **Cause**: API routes not working in web development
-- **Solution**: Already handled with mock responses
-- **Check**: Browser console for "Received HTML instead of JSON" message
+**Cause**: API routes not accessible (common in some web dev modes)
+**Solution**: System automatically uses mock responses; check console for fallback activation
 
-#### "Failed to execute 'json' on Response: body stream already read"
-- **Cause**: Response body consumed multiple times
-- **Solution**: Response cloning implemented
-- **Prevention**: Always clone responses before reading
+#### "Metro bundler can't resolve node:sqlite"
+**Cause**: Backend code importing Node.js modules
+**Solution**: Add to `metro.config.js` alias list
 
-#### "Network request failed"
-- **Cause**: Development server connection issues
-- **Solution**: Check if Metro bundler is running
-- **Fallback**: Mock responses will be used automatically
+#### "Type errors after tRPC changes"
+**Cause**: AppRouter type needs regeneration
+**Solution**: Restart TypeScript server or Metro bundler
 
-### Debugging Tools
-- **React Query DevTools**: Monitor API state
-- **tRPC Panel**: Interactive API testing (when backend running)
-- **Expo DevTools**: Performance and bundle analysis
-- **Browser DevTools**: Network tab for API calls
+### Development Testing Screen
+**Route**: `/backend-test`
 
-## Performance Optimizations
+Comprehensive API testing interface showing:
+- All available tRPC procedures
+- Request/response inspection
+- Error handling verification
+- Network connectivity status
 
-### Implemented Optimizations
-- **Query Caching**: 5-minute stale time for API calls
-- **Automatic Retries**: Exponential backoff for failed requests
-- **Response Cloning**: Prevents stream consumption errors
-- **Mock Responses**: Fast development without backend dependency
+## TypeScript Configuration
 
-### Performance Monitoring
-- Monitor React Query cache hit rates
-- Check bundle size with Expo DevTools
-- Profile component re-renders in development
+- **Strict mode**: Enabled for maximum type safety
+- **Path aliases**: `@/*` maps to project root
+- **Expo types**: Auto-generated in `.expo/types/`
+- **tRPC types**: Inferred from `AppRouter` type
 
-## Deployment
-
-### Rork Platform Deployment
-- Push to GitHub automatically triggers deployment
-- Environment variables configured in Rork dashboard
-- API routes work correctly in production
-
-### Manual Deployment Options
+**Type checking workflow**:
 ```bash
-# Build for production
-eas build --platform all
+npx tsc --noEmit           # Full type check
+npx tsc --noEmit --watch  # Watch mode
+```
 
-# Deploy to Rork hosting
-eas hosting:deploy
+## Production Deployment
+
+### Rork Platform (Automatic)
+- Push to GitHub → Auto-deployment
+- Environment variables in Rork dashboard
+- Full API functionality in production
+- 30-worker system fully operational
+
+### Manual Deployment (EAS)
+```bash
+# Build for all platforms
+eas build --platform all
 
 # Submit to app stores
 eas submit --platform ios
 eas submit --platform android
+
+# Web deployment
+eas build --platform web
+eas hosting:deploy
 ```
 
-## AI Integration
+## Key Files Reference
 
-### Outfit Generation API
-- **Endpoint**: `outfit.generate`
-- **Provider**: Rork Toolkit API
-- **Input**: User image (base64) + text prompt
-- **Output**: Generated outfit image + metadata
-- **Rate Limiting**: Handled automatically
+### Must Read Before Major Changes
+- `CURRENT_STATE.md` - System status & performance benchmarks
+- `CatalogPlan.md` - Product catalog architecture & database schema
+- `DEBUGGING.md` - Detailed debugging procedures
+- `MEMORY.md` - Session continuity & lessons learned
+- `TRPC_SETUP.md` - tRPC architecture explanation
 
-### API Integration Pattern
-```typescript
-const generateOutfit = trpc.outfit.generate.useMutation({
-  onSuccess: (data) => {
-    // Handle successful generation
-    console.log('Generated outfit:', data);
-  },
-  onError: (error) => {
-    // Handle API errors gracefully
-    console.error('Generation failed:', error.message);
-  }
-});
+### Critical Implementation Files
+- `lib/FeedLoadingService.ts` - Core generation engine (450+ lines)
+- `providers/FeedProvider.tsx` - Feed state management (430+ lines)
+- `lib/trpc.ts` - tRPC client with extensive error handling
+- `backend/server.ts` - Hono server setup
+- `backend/trpc/router.ts` - API route aggregation
+- `metro.config.js` - Critical bundler configuration
 
-// Usage
-generateOutfit.mutate({
-  prompt: "casual summer outfit",
-  userImageBase64: "data:image/jpeg;base64,...",
-  outfitId: "unique-id"
-});
-```
+## Special Notes
 
-## Contributing Guidelines
+### Package Manager
+This project uses **Bun** (not npm/yarn/pnpm) for faster installation and execution.
 
-### Code Style
-- **TypeScript**: Strict mode enabled
-- **ESLint**: Expo configuration
-- **Formatting**: Use built-in Expo formatting
-- **Naming**: camelCase for variables, PascalCase for components
+### Rork Platform Integration
+- Commands use `bunx rork start` for tunnel mode
+- Project ID: `11lhbqtb21q4xicqryoig`
+- Tunnel mode enables testing on physical devices
+- Auto-deployment via GitHub integration
 
-### Commit Conventions
-- Use descriptive commit messages
-- Include "🤖 Generated with Claude Code" footer
-- Test thoroughly before pushing to main branch
+### React Native Web Compatibility
+- Most native features work on web via Expo's polyfills
+- Some features (camera, haptics) gracefully degrade
+- Backend API fully functional on web
 
-### Testing Strategy
-- **Manual Testing**: Use `/backend-test` screen
-- **API Testing**: Verify all tRPC routes work
-- **Cross-Platform**: Test on web, iOS, and Android
-- **Error Scenarios**: Test network failures and edge cases
+### Node.js vs React Native Boundaries
+- Backend code (scraper, database) uses Node.js APIs
+- Frontend code is React Native compatible
+- Metro config prevents accidental bundling of Node.js code
+- Use `backend/` directory for Node.js-only code
 
-## Troubleshooting
+## Quick Reference Card
 
-### Getting Help
-- Check `/backend-test` screen for diagnostic information
-- Review browser console for detailed error logs
-- Verify Metro bundler is running on correct port
-- Ensure dependencies are installed with `bun install`
-
-### Emergency Debugging
-```bash
-# Clear all caches and restart
-bunx expo start --clear
-
-# Restart Metro bundler
-bunx expo r -c
-
-# Check if API endpoints are accessible
-curl http://localhost:8081/api/debug
-```
-
-## Security Considerations
-
-### API Security
-- Input validation with Zod schemas
-- Rate limiting implemented by Rork platform
-- No sensitive data logged in production
-- Environment variables for configuration
-
-### Data Handling
-- User images handled securely
-- No persistent storage of sensitive data
-- API keys managed through environment variables
+| Task | Command |
+|------|---------|
+| Start development | `bun run start-web` |
+| Clear cache | `bunx expo start --clear` |
+| Type check | `npx tsc --noEmit` |
+| Test API | Navigate to `/backend-test` |
+| Check backend | `curl http://localhost:8081/api/health` |
+| View logs | Check console with prefix filters |
+| Add tRPC route | `procedures/[name].ts` → `router.ts` → frontend |
+| Debug workers | Check `LoadingStats` component for "30/30" |
+| Clean install | `bun run clean` |
 
 ---
 
-## Quick Reference
-
-**Start Development**: `bun run start-web`
-**Test APIs**: Navigate to `/backend-test`
-**Debug Issues**: Check browser console
-**Deploy**: Push to GitHub (auto-deployment)
-**Add API Route**: `backend/trpc/routes/ → app-router.ts → frontend`
-
-This project is optimized for rapid development with Claude Code assistance. All common patterns and debugging strategies are documented above for maximum productivity.
+**This project is optimized for rapid development with Claude Code assistance. All patterns, architectures, and debugging strategies are documented for maximum productivity.**

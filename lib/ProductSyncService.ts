@@ -380,6 +380,12 @@ export class ProductSyncService {
     const config = this.RETAILER_CONFIG[retailerId as keyof typeof this.RETAILER_CONFIG];
     if (!config) return;
 
+    // Skip sync if API key is not configured
+    if (!config.apiKey) {
+      console.log(`[PRODUCT-SYNC] ⚠️ Skipping ${retailerId} - API key not configured`);
+      return;
+    }
+
     // Check rate limits
     if (!this.checkRateLimit(retailerId)) {
       console.warn(`[PRODUCT-SYNC] ⏳ Rate limit reached for ${retailerId}, skipping sync`);
@@ -395,11 +401,13 @@ export class ProductSyncService {
           'Authorization': `Bearer ${config.apiKey}`,
           'Content-Type': 'application/json',
           'X-Sync-Type': syncType
-        }
-      });
+        },
+        timeout: 5000 // 5 second timeout
+      } as any);
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        console.warn(`[PRODUCT-SYNC] ⚠️ ${retailerId} API returned ${response.status}, skipping`);
+        return;
       }
 
       const data = await response.json();
@@ -410,7 +418,8 @@ export class ProductSyncService {
 
     } catch (error) {
       this.updateRetailerMetrics(retailerId, false, 0);
-      throw error;
+      // Don't throw - just log and continue
+      console.log(`[PRODUCT-SYNC] ℹ️ ${retailerId} sync skipped (API unavailable)`);
     }
   }
 
@@ -599,17 +608,14 @@ export class ProductSyncService {
 
   private async registerWebhooks(): Promise<void> {
     for (const [retailerId, webhook] of this.webhooks.entries()) {
-      try {
-        await this.registerSingleWebhook(retailerId, webhook);
-      } catch (error) {
-        console.error(`[PRODUCT-SYNC] ❌ Failed to register webhook for ${retailerId}:`, error);
-      }
+      // registerSingleWebhook now handles its own errors gracefully
+      await this.registerSingleWebhook(retailerId, webhook);
     }
   }
 
   private async registerSingleWebhook(retailerId: string, webhook: RetailerWebhook): Promise<void> {
     const config = this.RETAILER_CONFIG[retailerId as keyof typeof this.RETAILER_CONFIG];
-    if (!config) return;
+    if (!config || !config.apiKey) return;
 
     const payload = {
       url: `${process.env.WEBHOOK_BASE_URL}/api/webhooks/${retailerId}`,
@@ -617,19 +623,24 @@ export class ProductSyncService {
       secret: webhook.secret
     };
 
-    const response = await fetch(webhook.endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const response = await fetch(webhook.endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
 
-    if (response.ok) {
-      webhook.isActive = true;
-      webhook.lastPing = Date.now();
-      console.log(`[PRODUCT-SYNC] ✅ Webhook registered for ${retailerId}`);
+      if (response.ok) {
+        webhook.isActive = true;
+        webhook.lastPing = Date.now();
+        console.log(`[PRODUCT-SYNC] ✅ Webhook registered for ${retailerId}`);
+      }
+    } catch (error) {
+      // Silently skip webhook registration if API is unavailable
+      console.log(`[PRODUCT-SYNC] ℹ️ ${retailerId} webhook skipped (API unavailable)`);
     }
   }
 

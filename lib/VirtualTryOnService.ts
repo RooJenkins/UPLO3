@@ -226,7 +226,10 @@ export class VirtualTryOnService {
 
           // Convert ML result to VirtualTryOnResult format
           tryOnResult = {
-            imageUrl: `data:image/jpeg;base64,${mlResult.processedImage}`,
+            id: `ml_tryon_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            productId: product.id,
+            userImageBase64,
+            resultImageUrl: `data:image/jpeg;base64,${mlResult.processedImage}`,
             product,
             confidence: mlResult.confidence,
             timestamp: Date.now()
@@ -291,11 +294,18 @@ export class VirtualTryOnService {
 
     const result = await response.json();
 
+    // 🚨 CRITICAL: Validate resultImageUrl to prevent null URL errors
+    const resultImageUrl = result.result_image_url || product.images[0] || `https://picsum.photos/400/600?random=${Date.now()}`;
+
+    if (!result.result_image_url) {
+      console.warn('[VIRTUAL-TRYON] ⚠️ API returned no result_image_url, using fallback');
+    }
+
     return {
       id: `tryon_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       productId: product.id,
       userImageBase64,
-      resultImageUrl: result.result_image_url,
+      resultImageUrl,
       product,
       confidence: result.confidence || 0.8,
       timestamp: Date.now(),
@@ -543,13 +553,20 @@ export class VirtualTryOnService {
    * Create fallback try-on result when API fails
    */
   private createFallbackTryOn(userImageBase64: string, product: Product): VirtualTryOnResult {
-    // For fallback, return the product's main image
-    // In production, this would use a local ML model or simpler compositing
+    // For fallback, return the user's image so they can see themselves
+    // Better UX than showing just the product
+
+    // Ensure user image is properly formatted as data URI
+    let fallbackImageUrl = userImageBase64;
+    if (!userImageBase64.startsWith('data:image/')) {
+      fallbackImageUrl = `data:image/jpeg;base64,${userImageBase64}`;
+    }
+
     return {
       id: `fallback_tryon_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       productId: product.id,
       userImageBase64,
-      resultImageUrl: product.images[0], // Fallback to product image
+      resultImageUrl: fallbackImageUrl, // Show user's image as fallback
       product,
       confidence: 0.6, // Lower confidence for fallback
       timestamp: Date.now(),

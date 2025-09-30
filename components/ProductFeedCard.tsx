@@ -81,6 +81,9 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
 
   const { product } = entry;
 
+  // Force reload to show outfit items - VERSION 2.0
+  console.log('[PRODUCTFEEDCARD] ✨ VERSION 2.0 - Rendering with 4 outfit items feature');
+
   // 🚨 CRITICAL: Final safety check for product image URL to prevent React Native crashes
   const fallbackProductImageUrl = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22400%22%20height%3D%22600%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22400%22%20height%3D%22600%22%20fill%3D%22%234ecdc4%22/%3E%3Ctext%20x%3D%22200%22%20y%3D%22250%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2220%22%20font-weight%3D%22bold%22%3EProduct%20Image%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22280%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EUnavailable%3C/text%3E%3Ctext%20x%3D%22200%22%20y%3D%22320%22%20text-anchor%3D%22middle%22%20fill%3D%22rgba(255,255,255,0.8)%22%20font-size%3D%2216%22%3EFallback%20Display%3C/text%3E%3C/svg%3E';
 
@@ -88,9 +91,17 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
     ? fallbackProductImageUrl
     : product.mainImage;
 
+  // 🚨 CRITICAL: Additional validation to ensure URL is never null/undefined
+  const finalImageUrl = safeProductImageUrl || fallbackProductImageUrl;
+
   // Log any URL issues for debugging
-  if (safeProductImageUrl !== product.mainImage) {
+  if (finalImageUrl !== product.mainImage) {
     console.warn('[PRODUCTFEEDCARD] 🚨 Invalid image URL detected in ProductFeedCard:', product.mainImage, 'using fallback for product:', product.id);
+  }
+
+  // Extra safety log
+  if (!finalImageUrl) {
+    console.error('[PRODUCTFEEDCARD] ❌ CRITICAL: finalImageUrl is null/undefined!', { product: product.id, mainImage: product.mainImage });
   }
   const displayPrice = selectedVariant?.sale_price || selectedVariant?.current_price || product.base_price;
   const originalPrice = selectedVariant?.current_price || product.base_price;
@@ -100,7 +111,7 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
-  }, [entry.id, product.mainImage]);
+  }, [entry.id, finalImageUrl]);
 
   const handleDoubleTap = () => {
     const now = Date.now();
@@ -229,6 +240,69 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
     return `$${(priceInCents / 100).toFixed(2)}`;
   };
 
+  // Generate complementary outfit items based on main product category
+  const generateOutfitItems = () => {
+    const category = product.category.slug.toLowerCase();
+    const items = [];
+
+    // Map of complementary items for each category
+    const outfitComplements = {
+      // Tops category
+      tops: [
+        { type: 'Top', brand: product.brand.name, name: product.name, price: formatPrice(displayPrice) },
+        { type: 'Bottom', brand: 'Levi\'s', name: 'Slim Fit Jeans', price: '$79.99' },
+        { type: 'Shoes', brand: 'Nike', name: 'Air Force 1', price: '$110' },
+        { type: 'Accessory', brand: 'Fossil', name: 'Leather Watch', price: '$125' },
+      ],
+      // Bottoms category
+      bottoms: [
+        { type: 'Top', brand: 'Uniqlo', name: 'Cotton T-Shirt', price: '$19.99' },
+        { type: 'Bottom', brand: product.brand.name, name: product.name, price: formatPrice(displayPrice) },
+        { type: 'Shoes', brand: 'Adidas', name: 'Stan Smith', price: '$90' },
+        { type: 'Accessory', brand: 'Herschel', name: 'Card Holder', price: '$25' },
+      ],
+      // Dresses category
+      dresses: [
+        { type: 'Dress', brand: product.brand.name, name: product.name, price: formatPrice(displayPrice) },
+        { type: 'Shoes', brand: 'Steve Madden', name: 'Heeled Sandals', price: '$89.99' },
+        { type: 'Accessory', brand: 'Michael Kors', name: 'Clutch Bag', price: '$198' },
+        { type: 'Jewelry', brand: 'Pandora', name: 'Bracelet Set', price: '$75' },
+      ],
+      // Outerwear category
+      outerwear: [
+        { type: 'Outerwear', brand: product.brand.name, name: product.name, price: formatPrice(displayPrice) },
+        { type: 'Top', brand: 'Gap', name: 'Crew Neck Sweater', price: '$49.99' },
+        { type: 'Bottom', brand: 'Dockers', name: 'Chinos', price: '$68' },
+        { type: 'Shoes', brand: 'Clarks', name: 'Desert Boots', price: '$130' },
+      ],
+      // Shoes category
+      shoes: [
+        { type: 'Top', brand: 'Champion', name: 'Graphic Hoodie', price: '$54.99' },
+        { type: 'Bottom', brand: 'Nike', name: 'Joggers', price: '$65' },
+        { type: 'Shoes', brand: product.brand.name, name: product.name, price: formatPrice(displayPrice) },
+        { type: 'Accessory', brand: 'Nike', name: 'Backpack', price: '$55' },
+      ],
+    };
+
+    // Check which category and get appropriate items
+    if (category.includes('top') || category.includes('shirt') || category.includes('blouse') || category.includes('sweater') || category.includes('hoodie')) {
+      return outfitComplements.tops;
+    } else if (category.includes('bottom') || category.includes('pant') || category.includes('jean') || category.includes('short') || category.includes('skirt')) {
+      return outfitComplements.bottoms;
+    } else if (category.includes('dress')) {
+      return outfitComplements.dresses;
+    } else if (category.includes('jacket') || category.includes('coat') || category.includes('blazer') || category.includes('cardigan')) {
+      return outfitComplements.outerwear;
+    } else if (category.includes('shoe') || category.includes('sneaker') || category.includes('boot') || category.includes('sandal')) {
+      return outfitComplements.shoes;
+    }
+
+    // Default: treat as a top
+    return outfitComplements.tops;
+  };
+
+  const outfitItems = generateOutfitItems();
+
   const favoriteId = `product_${product.id}`;
   const isFavorited = isFavorite(favoriteId);
 
@@ -240,13 +314,13 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
         activeOpacity={1}
       >
         <Image
-          source={{ uri: safeProductImageUrl }}
+          source={{ uri: finalImageUrl }}
           style={styles.image}
           resizeMode="cover"
           onError={(error) => {
             console.warn('[PRODUCTFEEDCARD] Image failed to load:', {
               originalUrl: product.mainImage,
-              safeUrl: safeProductImageUrl,
+              safeUrl: finalImageUrl,
               error: error.nativeEvent?.error || 'Unknown error',
               productId: product.id
             });
@@ -387,6 +461,19 @@ export function ProductFeedCard({ entry, isActive }: ProductFeedCardProps) {
           <Text style={styles.shopButtonText}>Shop Now</Text>
           <ExternalLink size={16} color="#fff" />
         </TouchableOpacity>
+
+        {/* Outfit Items - Compact Single Line Display */}
+        <View style={styles.outfitItemsContainer}>
+          {outfitItems.map((item, index) => (
+            <View key={index} style={styles.outfitItem}>
+              <Text style={styles.outfitItemType}>{item.type}</Text>
+              <Text style={styles.outfitItemSeparator}>•</Text>
+              <Text style={styles.outfitItemBrand}>{item.brand}</Text>
+              <Text style={styles.outfitItemName}>{item.name}</Text>
+              <Text style={styles.outfitItemPrice}>{item.price}</Text>
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -471,7 +558,7 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     position: 'absolute',
-    bottom: 60,
+    bottom: 140,
     left: 16,
     right: 80,
   },
@@ -494,10 +581,10 @@ const styles = StyleSheet.create({
   },
   productName: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
-    lineHeight: 28,
+    marginBottom: 6,
+    lineHeight: 26,
   },
   priceRow: {
     flexDirection: 'row',
@@ -517,7 +604,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   variantsContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   variantLabel: {
     color: '#fff',
@@ -528,11 +615,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     alignSelf: 'flex-start',
-    gap: 8,
+    gap: 6,
   },
   shopButtonText: {
     color: '#fff',
@@ -579,5 +666,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 12,
     textAlign: 'center',
+  },
+  outfitItemsContainer: {
+    marginTop: 8,
+    gap: 3,
+  },
+  outfitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  outfitItemType: {
+    color: '#4ECDC4',
+    fontSize: 10,
+    fontWeight: '700',
+    minWidth: 55,
+  },
+  outfitItemSeparator: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 9,
+  },
+  outfitItemBrand: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  outfitItemName: {
+    color: '#fff',
+    fontSize: 11,
+    opacity: 0.8,
+    flex: 1,
+  },
+  outfitItemPrice: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

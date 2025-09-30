@@ -481,9 +481,24 @@ export class MLModelService {
   }
 
   private generateProcessedImage(userImage: string, product: Product, poseData: PoseEstimationResult | null): string {
-    // In a real implementation, this would return the actual processed image
-    // For now, return a mock processed image identifier
-    return `processed_${product.id}_${Date.now()}.jpg`;
+    // In a real implementation, this would use advanced image processing to composite
+    // the product onto the user's body. For now, we return the user's image as a fallback
+    // so users can see themselves while we simulate the processing.
+
+    // TODO: Implement actual ML-based virtual try-on compositing
+    // For now, return the user's image (which should already be in base64 format)
+
+    // Ensure the image is properly formatted as a data URI
+    if (userImage.startsWith('data:image/')) {
+      return userImage; // Already a proper data URI
+    } else if (userImage.startsWith('/9j/') || userImage.includes('base64')) {
+      // Looks like raw base64, wrap it in a data URI
+      return `data:image/jpeg;base64,${userImage}`;
+    } else {
+      // Fallback: return the product image instead
+      console.warn('[ML-MODELS] ⚠️ User image format invalid, using product image as fallback');
+      return product.images[0] || '';
+    }
   }
 
   /**
