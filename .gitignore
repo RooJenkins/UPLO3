@@ -35,3 +35,20 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 .vercel
+
+# Python (catalog-service)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+catalog-service/venv/
+catalog-service/env/
+catalog-service/.env
+catalog-service/*.log
+catalog-service/.pytest_cache/
+catalog-service/.coverage
+catalog-service/htmlcov/
+catalog-service/.playwright/
+catalog-service/playwright-report/
+catalog-service/test-results/

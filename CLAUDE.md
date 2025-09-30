@@ -13,6 +13,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Platform**: Cross-platform (iOS, Android, Web) via Expo + Rork.com deployment
 
+**Monorepo Structure**: This repository contains both the mobile app and the backend catalog service.
+
+---
+
+## 📦 Catalog Service (Python Backend)
+
+The `catalog-service/` directory contains the **UPLO-DB** backend - a Python scraping and API service that provides real product data to the mobile app.
+
+### Quick Start (Catalog Service)
+```bash
+# Navigate to catalog service
+cd catalog-service
+
+# Setup Python environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+playwright install chromium
+
+# Configure database
+cp .env.example .env
+# Edit .env with DATABASE_URL
+
+# Initialize database
+python scripts/init_db.py
+
+# Run scraper
+python scraper/run.py --source hm --limit 50
+
+# Start API server (when implemented)
+uvicorn backend.api.main:app --reload --port 8000
+```
+
+### Catalog Service Documentation
+- **catalog-service/PRD.md** - Product requirements & architecture
+- **catalog-service/README.md** - Detailed usage guide
+- See catalog-service directory for full documentation
+
+### Integration
+The mobile app calls the catalog API for real product data:
+```
+EXPO_PUBLIC_UPLO_DB_API_URL=https://your-api.com/api/v1
+```
+
+---
+
 ## Development Commands
 
 ### Essential Workflow

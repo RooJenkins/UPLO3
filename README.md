@@ -1,11 +1,32 @@
-# Welcome to your Rork app
+# UPLO3 - AI Fashion Platform
 
-## Project info
+## Project Overview
 
-This is a native cross-platform mobile app created with [Rork](https://rork.com)
+UPLO3 is a comprehensive AI-powered fashion platform consisting of:
+- **Mobile App** - React Native + Expo Router fashion app with AI outfit generation
+- **Catalog Service** - Python backend for scraping and serving real product data
 
 **Platform**: Native iOS & Android app, exportable to web
 **Framework**: Expo Router + React Native
+**Backend**: Python (Playwright + FastAPI) in `catalog-service/`
+
+## Repository Structure
+
+```
+UPLO3/
+├── app/                    # Mobile app screens (Expo Router)
+├── backend/                # Mobile tRPC backend
+├── catalog-service/        # Python catalog backend (NEW)
+│   ├── scraper/            # Product scrapers (H&M, ASOS, etc.)
+│   ├── backend/            # FastAPI service
+│   ├── database/           # PostgreSQL schema
+│   └── scripts/            # Utility scripts
+├── components/             # React components
+├── lib/                    # Services & utilities
+└── providers/              # React context providers
+```
+
+For **catalog service documentation**, see [catalog-service/README.md](catalog-service/README.md)
 
 ## How can I edit this code?
 
