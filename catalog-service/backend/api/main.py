@@ -200,7 +200,7 @@ async def root():
     """Redirect root to API documentation"""
     return JSONResponse({
         "message": "UPLO-DB Catalog API",
-        "version": "1.0.0",
+        "version": "1.0.1-fix-json-serialization",  # Updated version to track deployment
         "docs": "/api/v1/docs",
         "health": "/api/v1/health",
         "endpoints": {
