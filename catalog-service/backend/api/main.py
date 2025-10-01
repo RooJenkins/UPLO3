@@ -181,7 +181,9 @@ async def get_feed(
 
     except Exception as e:
         logger.error(f"Feed retrieval failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve feed")
+        # Return more detailed error info for debugging
+        error_detail = f"Failed to retrieve feed: {str(e)}"
+        raise HTTPException(status_code=500, detail=error_detail)
 
 # Import and register route modules
 try:
